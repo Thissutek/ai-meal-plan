@@ -1,29 +1,49 @@
 {
   "expo": {
-    "name": "meal-plan-expo",
-    "slug": "meal-plan-expo",
+    "name": "AI Meal Planner",
+    "slug": "ai-meal-planner",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#2E7D32"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourname.aimealplanner",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera to take photos of grocery flyers for meal planning.",
+        "NSPhotoLibraryUsageDescription": "This app accesses your photo library to select flyer images for meal planning."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#2E7D32"
       },
-      "edgeToEdgeEnabled": true
+      "package": "com.yourname.aimealplanner",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    }
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow AI Meal Planner to access your camera to take photos of grocery flyers."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow AI Meal Planner to access your photos to select flyer images."
+        }
+      ]
+    ]
   }
 }

@@ -1,20 +1,87 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import HomeScreen from './src/screens/HomeScreen';
+import PreferencesScreen from './src/screens/PreferenceScreen';
+import CameraScreen from './src/screens/CameraScreen'
+import MealPlanScreen from './src/screens/MealPlanScreen';
 
-export default function App() {
-  return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
-  );
+export type RootStackParamList = {
+  Home: undefined;
+  Preferences: undefined;
+  Camera: undefined;
+  MealPlan: { mealPlan: MealPlan };
+};
+
+export interface MealPlan {
+  id: string;
+  meals: Meal[];
+  totalCost: number;
+  familySize: number;
+  preferences: UserPreferences;
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+export interface Meal {
+  id: string;
+  name: string;
+  ingredients: Ingredient[];
+  instructions: string[];
+  cost: number;
+  category: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+}
+
+export interface Ingredient {
+  name: string;
+  quantity: string;
+  price: number;
+  store?: string;
+}
+
+export interface UserPreferences {
+  familySize: number;
+  allergies: string[];
+  dietaryRestrictions: string[];
+  budget?: number;
+}
+
+const Stack = createStackNavigator<RootStackParamList>();
+
+export default function App(): JSX.Element {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator
+        initialRouteName="Home"
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: '#2E7D32',
+          },
+          headerTintColor: '#fff',
+          headerTitleStyle: {
+            fontWeight: 'bold',
+          },
+        }}
+      >
+        <Stack.Screen
+          name="Home"
+          component={HomeScreen}
+          options={{ title: 'AI Meal Planner' }}
+        />
+        <Stack.Screen
+          name="Preferences"
+          component={PreferencesScreen}
+          options={{ title: 'Your Preferences' }}
+        />
+        <Stack.Screen
+          name="Camera"
+          component={CameraScreen}
+          options={{ title: 'Scan Flyers' }}
+        />
+        <Stack.Screen
+          name="MealPlan"
+          component={MealPlanScreen}
+          options={{ title: 'Your Meal Plan' }}
+        />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
