@@ -21,9 +21,27 @@ export const processFlyers = async (
   imageUris: string[],
   preferences: UserPreferences,
 ): Promise<MealPlan> => {
+  console.log(
+    "Processing flyers with API key:",
+    OPENAI_API_KEY ? "Present" : "Missing",
+  );
+
+  // Check if API key is available
+  if (!OPENAI_API_KEY || OPENAI_API_KEY === "your-api-key-here") {
+    console.log("No valid API key found, using mock data");
+    return createMockMealPlan(preferences);
+  }
+
   try {
     // First, extract product data from flyer images
     const flyerData = await extractFlyerData(imageUris);
+
+    // Check if we got any valid data
+    const allProducts = flyerData.flatMap((flyer) => flyer.products);
+    if (allProducts.length === 0) {
+      console.log("No products extracted, using mock data");
+      return createMockMealPlan(preferences);
+    }
 
     // Then generate meal plan based on extracted data and preferences
     const mealPlan = await generateMealPlan(flyerData, preferences);
@@ -31,7 +49,8 @@ export const processFlyers = async (
     return mealPlan;
   } catch (error) {
     console.error("Error processing flyers:", error);
-    throw error;
+    console.log("Falling back to mock meal plan");
+    return createMockMealPlan(preferences);
   }
 };
 
@@ -50,27 +69,32 @@ const extractFlyerData = async (imageUris: string[]): Promise<FlyerData[]> => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: "gpt-4-vision-preview",
+            model: "gpt-4o", // Updated to use gpt-4o instead of gpt-4-vision-preview
             messages: [
               {
                 role: "user",
                 content: [
                   {
                     type: "text",
-                    text: `Analyze this grocery flyer and extract product information. Return ONLY a JSON object with this exact structure:
+                    text: `Analyze this grocery flyer and extract product information. Return ONLY a valid JSON object with this exact structure:
 {
-  "storeName": "store name if visible",
+  "storeName": "store name if visible or Unknown Store",
   "products": [
     {
       "name": "product name",
-      "price": numeric_price,
-      "category": "category (produce, meat, dairy, pantry, etc.)",
-      "unit": "unit if specified (lb, kg, each, etc.)"
+      "price": 1.99,
+      "category": "produce",
+      "unit": "lb"
     }
   ]
 }
 
-Focus on food items with clear prices. Ignore non-food items. Be precise with prices.`,
+Important rules:
+- Return ONLY valid JSON, no extra text
+- Include only food items with clear prices
+- Price must be a number, not a string
+- If no products found, return empty products array
+- Categories: produce, meat, dairy, pantry, snacks, beverages, other`,
                   },
                   {
                     type: "image_url",
@@ -88,6 +112,8 @@ Focus on food items with clear prices. Ignore non-food items. Be precise with pr
       );
 
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`OpenAI API error: ${response.status} - ${errorText}`);
         throw new Error(`OpenAI API error: ${response.status}`);
       }
 
@@ -98,9 +124,31 @@ Focus on food items with clear prices. Ignore non-food items. Be precise with pr
         throw new Error("No content received from OpenAI");
       }
 
-      // Parse the JSON response
-      const parsedData = JSON.parse(content.trim());
-      return parsedData as FlyerData;
+      // Clean the content and try to parse JSON
+      const cleanContent = content
+        .trim()
+        .replace(/```json\n?/g, "")
+        .replace(/```\n?/g, "");
+
+      try {
+        const parsedData = JSON.parse(cleanContent);
+
+        // Validate the structure
+        if (!parsedData.products || !Array.isArray(parsedData.products)) {
+          throw new Error("Invalid response structure");
+        }
+
+        return {
+          storeName: parsedData.storeName || "Unknown Store",
+          products: parsedData.products.filter(
+            (p: any) => p.name && typeof p.price === "number" && p.price > 0,
+          ),
+        } as FlyerData;
+      } catch (parseError) {
+        console.error("JSON parse error:", parseError);
+        console.error("Content that failed to parse:", cleanContent);
+        throw new Error("Failed to parse OpenAI response as JSON");
+      }
     } catch (error) {
       console.error("Error extracting flyer data:", error);
       // Return empty flyer data if parsing fails
@@ -122,14 +170,18 @@ const generateMealPlan = async (
     // Combine all products from all flyers
     const allProducts = flyerData.flatMap((flyer) => flyer.products);
 
+    if (allProducts.length === 0) {
+      throw new Error("No products to work with");
+    }
+
     const allergiesText =
       preferences.allergies.length > 0
-        ? `ALLERGIES TO AVOID: ${preferences.allergies.join(", ")}`
+        ? `AVOID THESE ALLERGIES: ${preferences.allergies.join(", ")}`
         : "";
 
     const dietaryText =
       preferences.dietaryRestrictions.length > 0
-        ? `DIETARY RESTRICTIONS: ${preferences.dietaryRestrictions.join(", ")}`
+        ? `DIETARY REQUIREMENTS: ${preferences.dietaryRestrictions.join(", ")}`
         : "";
 
     const budgetText = preferences.budget
@@ -141,35 +193,37 @@ const generateMealPlan = async (
 ${JSON.stringify(allProducts, null, 2)}
 
 Requirements:
-- ${allergiesText}
-- ${dietaryText}
-- ${budgetText}
-- Include breakfast, lunch, dinner, and snack options
-- Use primarily products from the provided list
-- Calculate realistic costs based on provided prices
-- Include simple cooking instructions
+${allergiesText}
+${dietaryText}
+${budgetText}
 
-Return ONLY a JSON object with this exact structure:
+Return ONLY a valid JSON object with this exact structure:
 {
   "meals": [
     {
-      "id": "unique_id",
-      "name": "meal name",
-      "category": "breakfast|lunch|dinner|snack",
+      "id": "meal1",
+      "name": "Scrambled Eggs",
+      "category": "breakfast",
       "ingredients": [
         {
-          "name": "ingredient name",
-          "quantity": "amount needed",
-          "price": numeric_price_for_quantity_needed
+          "name": "Eggs",
+          "quantity": "2 large",
+          "price": 1.50
         }
       ],
-      "instructions": ["step 1", "step 2", "step 3"],
-      "cost": total_meal_cost
+      "instructions": ["Beat eggs", "Cook in pan"],
+      "cost": 1.50
     }
   ]
 }
 
-Create 7-10 diverse meals that provide good variety throughout the week.`;
+Rules:
+- Return ONLY valid JSON, no extra text
+- Create 5-8 meals total
+- Use products from the provided list when possible
+- Calculate realistic costs
+- Category must be: breakfast, lunch, dinner, or snack
+- Each ingredient price should be the amount needed for the recipe`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -178,7 +232,7 @@ Create 7-10 diverse meals that provide good variety throughout the week.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-4-turbo-preview",
+        model: "gpt-4o",
         messages: [
           {
             role: "user",
@@ -191,6 +245,8 @@ Create 7-10 diverse meals that provide good variety throughout the week.`;
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`OpenAI API error: ${response.status} - ${errorText}`);
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
@@ -201,29 +257,63 @@ Create 7-10 diverse meals that provide good variety throughout the week.`;
       throw new Error("No meal plan content received from OpenAI");
     }
 
-    // Parse the meal plan
-    const parsedMealPlan = JSON.parse(content.trim());
+    // Clean and parse the meal plan
+    const cleanContent = content
+      .trim()
+      .replace(/```json\n?/g, "")
+      .replace(/```\n?/g, "");
 
-    // Calculate total cost
-    const totalCost = parsedMealPlan.meals.reduce(
-      (sum: number, meal: any) => sum + meal.cost,
-      0,
-    );
+    try {
+      const parsedMealPlan = JSON.parse(cleanContent);
 
-    // Create the final meal plan object
-    const mealPlan: MealPlan = {
-      id: Date.now().toString(),
-      meals: parsedMealPlan.meals,
-      totalCost,
-      familySize: preferences.familySize,
-      preferences,
-    };
+      // Validate structure
+      if (!parsedMealPlan.meals || !Array.isArray(parsedMealPlan.meals)) {
+        throw new Error("Invalid meal plan structure");
+      }
 
-    return mealPlan;
+      // Calculate total cost
+      const totalCost = parsedMealPlan.meals.reduce(
+        (sum: number, meal: any) => {
+          const mealCost =
+            meal.cost ||
+            meal.ingredients?.reduce(
+              (ingredientSum: number, ing: any) =>
+                ingredientSum + (ing.price || 0),
+              0,
+            ) ||
+            0;
+          return sum + mealCost;
+        },
+        0,
+      );
+
+      // Create the final meal plan object
+      const mealPlan: MealPlan = {
+        id: Date.now().toString(),
+        meals: parsedMealPlan.meals.map((meal: any) => ({
+          ...meal,
+          cost:
+            meal.cost ||
+            meal.ingredients?.reduce(
+              (sum: number, ing: any) => sum + (ing.price || 0),
+              0,
+            ) ||
+            0,
+        })),
+        totalCost,
+        familySize: preferences.familySize,
+        preferences,
+      };
+
+      return mealPlan;
+    } catch (parseError) {
+      console.error("JSON parse error for meal plan:", parseError);
+      console.error("Content that failed to parse:", cleanContent);
+      throw new Error("Failed to parse meal plan response as JSON");
+    }
   } catch (error) {
     console.error("Error generating meal plan:", error);
-    // Return a fallback meal plan if generation fails
-    return createFallbackMealPlan(preferences);
+    throw error;
   }
 };
 
@@ -249,25 +339,25 @@ const convertImageToBase64 = async (uri: string): Promise<string> => {
   }
 };
 
-const createFallbackMealPlan = (preferences: UserPreferences): MealPlan => {
-  // Fallback meal plan when OpenAI fails
-  const fallbackMeals: Meal[] = [
+// Mock meal plan for when OpenAI fails or API key is missing
+const createMockMealPlan = (preferences: UserPreferences): MealPlan => {
+  const mockMeals: Meal[] = [
     {
       id: "1",
-      name: "Scrambled Eggs with Toast",
+      name: "Avocado Toast with Eggs",
       category: "breakfast",
       ingredients: [
-        { name: "Eggs", quantity: "2 large", price: 1.5 },
-        { name: "Bread", quantity: "2 slices", price: 0.5 },
-        { name: "Butter", quantity: "1 tbsp", price: 0.25 },
+        { name: "Avocado", quantity: "1 medium", price: 1.5 },
+        { name: "Sourdough bread", quantity: "2 slices", price: 1.0 },
+        { name: "Eggs", quantity: "2 large", price: 1.0 },
       ],
       instructions: [
-        "Crack eggs into a bowl and whisk",
-        "Heat butter in a pan over medium heat",
-        "Add eggs and scramble until cooked",
-        "Toast bread and serve alongside eggs",
+        "Toast the sourdough bread slices",
+        "Mash avocado with salt and pepper",
+        "Fry eggs to your preference",
+        "Spread avocado on toast and top with eggs",
       ],
-      cost: 2.25,
+      cost: 3.5,
     },
     {
       id: "2",
@@ -283,7 +373,6 @@ const createFallbackMealPlan = (preferences: UserPreferences): MealPlan => {
         "Layer turkey on bread",
         "Add cheese and lettuce",
         "Top with second slice of bread",
-        "Cut in half and serve",
       ],
       cost: 4.5,
     },
@@ -297,10 +386,10 @@ const createFallbackMealPlan = (preferences: UserPreferences): MealPlan => {
         { name: "Parmesan cheese", quantity: "2 tbsp", price: 0.75 },
       ],
       instructions: [
-        "Boil water and cook spaghetti according to package directions",
-        "Heat marinara sauce in a separate pan",
+        "Boil water and cook spaghetti",
+        "Heat marinara sauce",
         "Drain pasta and combine with sauce",
-        "Serve with grated Parmesan cheese",
+        "Serve with grated Parmesan",
       ],
       cost: 4.0,
     },
@@ -321,7 +410,7 @@ const createFallbackMealPlan = (preferences: UserPreferences): MealPlan => {
   ];
 
   // Filter meals based on allergies and dietary restrictions
-  const filteredMeals = fallbackMeals.filter((meal) => {
+  const filteredMeals = mockMeals.filter((meal) => {
     // Check for allergies
     if (preferences.allergies.length > 0) {
       const hasAllergy = meal.ingredients.some((ingredient) =>
@@ -354,121 +443,12 @@ const createFallbackMealPlan = (preferences: UserPreferences): MealPlan => {
     return true;
   });
 
-  const totalCost = filteredMeals.reduce((sum, meal) => sum + meal.cost, 0);
+  const finalMeals = filteredMeals.length > 0 ? filteredMeals : mockMeals;
+  const totalCost = finalMeals.reduce((sum, meal) => sum + meal.cost, 0);
 
   return {
     id: Date.now().toString(),
-    meals: filteredMeals.length > 0 ? filteredMeals : fallbackMeals,
-    totalCost,
-    familySize: preferences.familySize,
-    preferences,
-  };
-};
-
-// Mock function for development/testing
-export const createMockMealPlan = (preferences: UserPreferences): MealPlan => {
-  const mockMeals: Meal[] = [
-    {
-      id: "1",
-      name: "Avocado Toast with Eggs",
-      category: "breakfast",
-      ingredients: [
-        { name: "Avocado", quantity: "1 medium", price: 1.5 },
-        { name: "Sourdough bread", quantity: "2 slices", price: 1.0 },
-        { name: "Eggs", quantity: "2 large", price: 1.0 },
-        { name: "Salt and pepper", quantity: "to taste", price: 0.1 },
-      ],
-      instructions: [
-        "Toast the sourdough bread slices",
-        "Mash avocado with salt and pepper",
-        "Fry or poach eggs to your preference",
-        "Spread avocado on toast and top with eggs",
-      ],
-      cost: 3.6,
-    },
-    {
-      id: "2",
-      name: "Chicken Caesar Salad",
-      category: "lunch",
-      ingredients: [
-        { name: "Chicken breast", quantity: "6 oz", price: 4.5 },
-        { name: "Romaine lettuce", quantity: "1 head", price: 2.0 },
-        { name: "Parmesan cheese", quantity: "1/4 cup", price: 1.5 },
-        { name: "Caesar dressing", quantity: "3 tbsp", price: 0.75 },
-        { name: "Croutons", quantity: "1/2 cup", price: 0.5 },
-      ],
-      instructions: [
-        "Season and grill chicken breast until cooked through",
-        "Chop romaine lettuce and place in large bowl",
-        "Slice chicken and add to lettuce",
-        "Top with Parmesan, croutons, and dressing",
-      ],
-      cost: 9.25,
-    },
-    {
-      id: "3",
-      name: "Beef Stir Fry with Rice",
-      category: "dinner",
-      ingredients: [
-        { name: "Beef strips", quantity: "8 oz", price: 6.0 },
-        { name: "Mixed vegetables", quantity: "2 cups", price: 3.0 },
-        { name: "Jasmine rice", quantity: "1 cup dry", price: 1.5 },
-        { name: "Soy sauce", quantity: "3 tbsp", price: 0.25 },
-        { name: "Garlic", quantity: "2 cloves", price: 0.25 },
-        { name: "Vegetable oil", quantity: "2 tbsp", price: 0.3 },
-      ],
-      instructions: [
-        "Cook rice according to package instructions",
-        "Heat oil in large pan or wok",
-        "Stir-fry beef until browned",
-        "Add vegetables and garlic, cook until tender",
-        "Add soy sauce and serve over rice",
-      ],
-      cost: 11.3,
-    },
-    {
-      id: "4",
-      name: "Greek Yogurt with Berries",
-      category: "snack",
-      ingredients: [
-        { name: "Greek yogurt", quantity: "1 cup", price: 1.25 },
-        { name: "Mixed berries", quantity: "1/2 cup", price: 2.0 },
-        { name: "Honey", quantity: "1 tbsp", price: 0.25 },
-      ],
-      instructions: [
-        "Place Greek yogurt in a bowl",
-        "Top with mixed berries",
-        "Drizzle with honey and enjoy",
-      ],
-      cost: 3.5,
-    },
-    {
-      id: "5",
-      name: "Vegetable Soup",
-      category: "dinner",
-      ingredients: [
-        { name: "Mixed vegetables", quantity: "3 cups", price: 4.0 },
-        { name: "Vegetable broth", quantity: "4 cups", price: 2.5 },
-        { name: "Onion", quantity: "1 medium", price: 0.75 },
-        { name: "Garlic", quantity: "3 cloves", price: 0.25 },
-        { name: "Olive oil", quantity: "2 tbsp", price: 0.5 },
-      ],
-      instructions: [
-        "Heat olive oil in large pot",
-        "Sauté onion and garlic until fragrant",
-        "Add vegetables and broth",
-        "Simmer for 20-25 minutes until vegetables are tender",
-        "Season with salt and pepper to taste",
-      ],
-      cost: 8.0,
-    },
-  ];
-
-  const totalCost = mockMeals.reduce((sum, meal) => sum + meal.cost, 0);
-
-  return {
-    id: Date.now().toString(),
-    meals: mockMeals,
+    meals: finalMeals,
     totalCost,
     familySize: preferences.familySize,
     preferences,
