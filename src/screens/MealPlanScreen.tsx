@@ -10,7 +10,7 @@ import {
   Share,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
-import { RootStackParamList, MealPlan, Meal } from '../App';
+import { RootStackParamList, MealPlan, Meal } from '../../App';
 
 type Props = StackScreenProps<RootStackParamList, 'MealPlan'>;
 

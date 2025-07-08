@@ -11,11 +11,11 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
-import { RootStackParamList, UserPreferences } from '../App';
+import { RootStackParamList, UserPreferences } from '../../App';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { processFlyers } from '../services/openaiService';
+import { extractFlyerData } from '../services/openaiService';
 
 type Props = StackScreenProps<RootStackParamList, 'Camera'>;
 
@@ -106,12 +106,19 @@ const CameraScreen: React.FC<Props> = ({ navigation }) => {
 
       const preferences: UserPreferences = JSON.parse(storedPreferences);
 
-      // Process images with OpenAI
+      // Extract flyer data from images
       const imageUris = capturedImages.map(img => img.uri);
-      const mealPlan = await processFlyers(imageUris, preferences);
+      console.log('About to extract flyer data from', imageUris.length, 'images');
+      const flyerData = await extractFlyerData(imageUris);
+      console.log('Extracted flyer data:', flyerData);
 
-      // Navigate to meal plan screen
-      navigation.navigate('MealPlan', { mealPlan });
+      // Navigate to flyer results screen to show parsed data
+      console.log('Navigating to FlyerResults screen');
+      navigation.navigate('FlyerResults', {
+        flyerData,
+        imageUris,
+        preferences
+      });
 
     } catch (error) {
       console.error('Error processing images:', error);
@@ -123,7 +130,6 @@ const CameraScreen: React.FC<Props> = ({ navigation }) => {
       setIsProcessing(false);
     }
   };
-
   if (!permission) {
     return (
       <View style={styles.container}>
@@ -151,36 +157,38 @@ const CameraScreen: React.FC<Props> = ({ navigation }) => {
   if (showCamera) {
     return (
       <SafeAreaView style={styles.container}>
+        {/* Camera view with no children */}
         <CameraView
           style={styles.camera}
           facing={facing}
           ref={(ref) => setCameraRef(ref)}
-        >
-          <View style={styles.cameraButtonContainer}>
-            <TouchableOpacity
-              style={styles.cameraButton}
-              onPress={() => setShowCamera(false)}
-            >
-              <Text style={styles.cameraButtonText}>Cancel</Text>
-            </TouchableOpacity>
+        />
 
-            <TouchableOpacity
-              style={styles.captureButton}
-              onPress={takePicture}
-            >
-              <View style={styles.captureButtonInner} />
-            </TouchableOpacity>
+        {/* Camera controls positioned absolutely on top */}
+        <View style={styles.cameraButtonContainer}>
+          <TouchableOpacity
+            style={styles.cameraButton}
+            onPress={() => setShowCamera(false)}
+          >
+            <Text style={styles.cameraButtonText}>Cancel</Text>
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.cameraButton}
-              onPress={() => {
-                setFacing(current => (current === 'back' ? 'front' : 'back'));
-              }}
-            >
-              <Text style={styles.cameraButtonText}>Flip</Text>
-            </TouchableOpacity>
-          </View>
-        </CameraView>
+          <TouchableOpacity
+            style={styles.captureButton}
+            onPress={takePicture}
+          >
+            <View style={styles.captureButtonInner} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.cameraButton}
+            onPress={() => {
+              setFacing(current => (current === 'back' ? 'front' : 'back'));
+            }}
+          >
+            <Text style={styles.cameraButtonText}>Flip</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
@@ -268,7 +276,7 @@ const CameraScreen: React.FC<Props> = ({ navigation }) => {
             </View>
           ) : (
             <Text style={styles.processButtonText}>
-              Generate Meal Plan ({capturedImages.length} image{capturedImages.length !== 1 ? 's' : ''})
+              Analyze Flyers ({capturedImages.length} image{capturedImages.length !== 1 ? 's' : ''})
             </Text>
           )}
         </TouchableOpacity>
@@ -420,7 +428,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   cameraButtonContainer: {
-    flex: 1,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     backgroundColor: 'transparent',
     flexDirection: 'row',
     justifyContent: 'space-between',

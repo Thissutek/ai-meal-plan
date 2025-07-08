@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
-import { RootStackParamList, UserPreferences } from '../App';
+import { RootStackParamList, UserPreferences } from '../../App';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Props = StackScreenProps<RootStackParamList, 'Home'>;
