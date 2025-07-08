@@ -11,16 +11,36 @@ import {
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList, UserPreferences } from '../../App';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getMealPlanCount } from '../services/mealPlanStorage';
 
 type Props = StackScreenProps<RootStackParamList, 'Home'>;
 
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [hasPreferences, setHasPreferences] = useState(false);
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
+  const [savedPlansCount, setSavedPlansCount] = useState(0);
 
   useEffect(() => {
     loadPreferences();
+    loadMealPlanCount();
   }, []);
+
+  // Reload meal plan count when screen comes into focus
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadMealPlanCount();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  const loadMealPlanCount = async () => {
+    try {
+      const count = await getMealPlanCount();
+      setSavedPlansCount(count);
+    } catch (error) {
+      console.error('Error loading meal plan count:', error);
+    }
+  };
 
   const loadPreferences = async () => {
     try {
@@ -59,7 +79,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       <StatusBar barStyle="light-content" backgroundColor="#2E7D32" />
 
       <View style={styles.header}>
-        <Text style={styles.title}>Home Screen</Text>
+        <Text style={styles.title}>AI Meal Planner</Text>
         <Text style={styles.subtitle}>
           Take photos of grocery flyers and get personalized meal plans with cost estimates
         </Text>
@@ -105,6 +125,10 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.stepNumber}>3</Text>
             <Text style={styles.stepText}>Get AI-generated meal plans with cost estimates</Text>
           </View>
+          <View style={styles.step}>
+            <Text style={styles.stepNumber}>4</Text>
+            <Text style={styles.stepText}>Save your favorite meal plans for later</Text>
+          </View>
         </View>
       </View>
 
@@ -124,6 +148,16 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.primaryButtonText}>Start Meal Planning</Text>
           </TouchableOpacity>
         )}
+
+        {/* Smaller saved plans button */}
+        <TouchableOpacity
+          style={styles.savedPlansButton}
+          onPress={() => navigation.navigate('SavedPlans')}
+        >
+          <Text style={styles.savedPlansButtonText}>
+            📋 Saved Plans {savedPlansCount > 0 ? `(${savedPlansCount})` : ''}
+          </Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
@@ -230,6 +264,23 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     padding: 20,
+    gap: 15,
+  },
+  savedPlansButton: {
+    backgroundColor: '#E3F2FD',
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    alignSelf: 'center',
+    borderWidth: 1,
+    borderColor: '#2196F3',
+    marginTop: 5,
+  },
+  savedPlansButtonText: {
+    color: '#2196F3',
+    fontSize: 14,
+    fontWeight: '600',
   },
   primaryButton: {
     backgroundColor: '#4CAF50',

@@ -10,7 +10,7 @@ export interface Product {
   unit?: string;
   originalPrice?: number;
   onSale?: boolean;
-}import React from 'react';
+}import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import HomeScreen from './src/screens/HomeScreen';
@@ -18,6 +18,8 @@ import PreferencesScreen from './src/screens/PreferenceScreen';
 import CameraScreen from './src/screens/CameraScreen';
 import FlyerResultsScreen from './src/screens/FlyerResultsScreen';
 import MealPlanScreen from './src/screens/MealPlanScreen';
+import SavedPlansScreen from './src/screens/SavedPlansScreen';
+import { initializeDeviceId } from './src/services/deviceService';
 
 export type RootStackParamList = {
   Home: undefined;
@@ -25,6 +27,7 @@ export type RootStackParamList = {
   Camera: undefined;
   FlyerResults: { flyerData: FlyerData[], imageUris: string[], preferences: UserPreferences };
   MealPlan: { mealPlan: MealPlan };
+  SavedPlans: undefined;
 };
 
 export interface MealPlan {
@@ -61,6 +64,13 @@ export interface UserPreferences {
 const Stack = createStackNavigator<RootStackParamList>();
 
 export default function App(): JSX.Element {
+  useEffect(() => {
+    // Initialize device ID when app starts
+    initializeDeviceId().then(deviceId => {
+      console.log('App started with device ID:', deviceId);
+    });
+  }, []);
+
   return (
     <NavigationContainer>
       <Stack.Navigator
@@ -99,6 +109,11 @@ export default function App(): JSX.Element {
           name="MealPlan"
           component={MealPlanScreen}
           options={{ title: 'Your Meal Plan' }}
+        />
+        <Stack.Screen
+          name="SavedPlans"
+          component={SavedPlansScreen}
+          options={{ title: 'Saved Meal Plans' }}
         />
       </Stack.Navigator>
     </NavigationContainer>
