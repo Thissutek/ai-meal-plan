@@ -9,6 +9,8 @@ import {
   Alert,
   ActivityIndicator,
   Image,
+  TextInput,
+  Modal,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList, FlyerData, Product } from '../../App';
@@ -17,12 +19,120 @@ import { generateMealPlanFromProducts } from '../services/openaiService';
 type Props = StackScreenProps<RootStackParamList, 'FlyerResults'>;
 
 const FlyerResultsScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { flyerData, imageUris, preferences } = route.params;
+  const { flyerData: initialFlyerData, imageUris, preferences } = route.params;
+  const [flyerData, setFlyerData] = useState<FlyerData[]>(initialFlyerData);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<{ product: Product, flyerIndex: number, productIndex: number } | null>(null);
+  const [showAddProductModal, setShowAddProductModal] = useState(false);
+  const [selectedFlyerIndex, setSelectedFlyerIndex] = useState(0);
+
+  // Form state for editing/adding products
+  const [editForm, setEditForm] = useState({
+    name: '',
+    price: '',
+    category: 'other',
+    unit: '',
+    originalPrice: '',
+    onSale: false
+  });
 
   const allProducts = flyerData.flatMap(flyer => flyer.products);
   const totalProducts = allProducts.length;
   const totalStores = flyerData.length;
+
+  const categories = ['produce', 'meat', 'dairy', 'pantry', 'snacks', 'beverages', 'frozen', 'bakery', 'deli', 'other'];
+
+  const resetEditForm = () => {
+    setEditForm({
+      name: '',
+      price: '',
+      category: 'other',
+      unit: '',
+      originalPrice: '',
+      onSale: false
+    });
+  };
+
+  const openEditModal = (product: Product, flyerIndex: number, productIndex: number) => {
+    setEditForm({
+      name: product.name,
+      price: product.price.toString(),
+      category: product.category,
+      unit: product.unit || '',
+      originalPrice: product.originalPrice?.toString() || '',
+      onSale: product.onSale || false
+    });
+    setEditingProduct({ product, flyerIndex, productIndex });
+  };
+
+  const openAddModal = (flyerIndex: number) => {
+    resetEditForm();
+    setSelectedFlyerIndex(flyerIndex);
+    setShowAddProductModal(true);
+  };
+
+  const saveProductEdit = () => {
+    if (!editForm.name.trim() || !editForm.price.trim()) {
+      Alert.alert('Missing Information', 'Please enter both product name and price.');
+      return;
+    }
+
+    const price = parseFloat(editForm.price);
+    if (isNaN(price) || price <= 0) {
+      Alert.alert('Invalid Price', 'Please enter a valid price.');
+      return;
+    }
+
+    const originalPrice = editForm.originalPrice ? parseFloat(editForm.originalPrice) : undefined;
+    if (editForm.originalPrice && (isNaN(originalPrice!) || originalPrice! <= price)) {
+      Alert.alert('Invalid Original Price', 'Original price must be higher than sale price.');
+      return;
+    }
+
+    const updatedProduct: Product = {
+      name: editForm.name.trim(),
+      price: price,
+      category: editForm.category,
+      unit: editForm.unit.trim() || undefined,
+      originalPrice: originalPrice,
+      onSale: editForm.onSale && originalPrice !== undefined
+    };
+
+    if (editingProduct) {
+      // Update existing product
+      const newFlyerData = [...flyerData];
+      newFlyerData[editingProduct.flyerIndex].products[editingProduct.productIndex] = updatedProduct;
+      setFlyerData(newFlyerData);
+      setEditingProduct(null);
+    } else {
+      // Add new product
+      const newFlyerData = [...flyerData];
+      newFlyerData[selectedFlyerIndex].products.push(updatedProduct);
+      setFlyerData(newFlyerData);
+      setShowAddProductModal(false);
+    }
+
+    resetEditForm();
+  };
+
+  const deleteProduct = (flyerIndex: number, productIndex: number) => {
+    Alert.alert(
+      'Delete Product',
+      'Are you sure you want to remove this product?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            const newFlyerData = [...flyerData];
+            newFlyerData[flyerIndex].products.splice(productIndex, 1);
+            setFlyerData(newFlyerData);
+          }
+        }
+      ]
+    );
+  };
 
   const formatPrice = (price: number): string => {
     return `$${price.toFixed(2)}`;
@@ -82,7 +192,7 @@ const FlyerResultsScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   };
 
-  const renderProduct = (product: Product, index: number) => {
+  const renderProduct = (product: Product, index: number, flyerIndex: number) => {
     const categoryColor = getCategoryColor(product.category);
     const categoryIcon = getCategoryIcon(product.category);
 
@@ -120,33 +230,59 @@ const FlyerResultsScreen: React.FC<Props> = ({ route, navigation }) => {
             </View>
           )}
         </View>
+
+        {/* Edit/Delete Controls */}
+        <View style={styles.productControls}>
+          <TouchableOpacity
+            style={styles.editButton}
+            onPress={() => openEditModal(product, flyerIndex, index)}
+          >
+            <Text style={styles.editButtonText}>✏️ Edit</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => deleteProduct(flyerIndex, index)}
+          >
+            <Text style={styles.deleteButtonText}>🗑️ Delete</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
 
   const renderFlyerSection = (flyer: FlyerData, index: number) => {
-    if (flyer.products.length === 0) {
-      return (
-        <View key={index} style={styles.flyerSection}>
-          <View style={styles.flyerHeader}>
-            <Text style={styles.flyerTitle}>📄 {flyer.storeName}</Text>
-            <Text style={styles.noProductsText}>No products found in this flyer</Text>
-          </View>
-        </View>
-      );
-    }
-
     return (
       <View key={index} style={styles.flyerSection}>
         <View style={styles.flyerHeader}>
           <Text style={styles.flyerTitle}>🏪 {flyer.storeName}</Text>
-          <Text style={styles.productCount}>
-            {flyer.products.length} product{flyer.products.length !== 1 ? 's' : ''} found
-          </Text>
+          <View style={styles.flyerHeaderActions}>
+            <Text style={styles.productCount}>
+              {flyer.products.length} product{flyer.products.length !== 1 ? 's' : ''}
+            </Text>
+            <TouchableOpacity
+              style={styles.addProductButton}
+              onPress={() => openAddModal(index)}
+            >
+              <Text style={styles.addProductButtonText}>+ Add Product</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {flyer.products.map((product, productIndex) =>
-          renderProduct(product, productIndex)
+        {flyer.products.length === 0 ? (
+          <View style={styles.noProductsContainer}>
+            <Text style={styles.noProductsText}>No products found in this flyer</Text>
+            <TouchableOpacity
+              style={styles.addFirstProductButton}
+              onPress={() => openAddModal(index)}
+            >
+              <Text style={styles.addFirstProductButtonText}>+ Add First Product</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          flyer.products.map((product, productIndex) =>
+            renderProduct(product, productIndex, index)
+          )
         )}
       </View>
     );
@@ -226,6 +362,129 @@ const FlyerResultsScreen: React.FC<Props> = ({ route, navigation }) => {
 
         </View>
       </ScrollView>
+
+      {/* Edit/Add Product Modal */}
+      <Modal
+        visible={editingProduct !== null || showAddProductModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => {
+          setEditingProduct(null);
+          setShowAddProductModal(false);
+          resetEditForm();
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {editingProduct ? 'Edit Product' : 'Add Product'}
+            </Text>
+
+            <ScrollView style={styles.modalForm}>
+              {/* Product Name */}
+              <Text style={styles.fieldLabel}>Product Name *</Text>
+              <TextInput
+                style={styles.textInput}
+                value={editForm.name}
+                onChangeText={(text) => setEditForm({ ...editForm, name: text })}
+                placeholder="e.g., Organic Bananas"
+                autoCapitalize="words"
+              />
+
+              {/* Price */}
+              <Text style={styles.fieldLabel}>Price *</Text>
+              <TextInput
+                style={styles.textInput}
+                value={editForm.price}
+                onChangeText={(text) => setEditForm({ ...editForm, price: text })}
+                placeholder="e.g., 2.99"
+                keyboardType="decimal-pad"
+              />
+
+              {/* Category */}
+              <Text style={styles.fieldLabel}>Category</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
+                {categories.map((category) => (
+                  <TouchableOpacity
+                    key={category}
+                    style={[
+                      styles.categoryOption,
+                      editForm.category === category && styles.categoryOptionSelected,
+                      { backgroundColor: editForm.category === category ? getCategoryColor(category) : '#f0f0f0' }
+                    ]}
+                    onPress={() => setEditForm({ ...editForm, category })}
+                  >
+                    <Text style={styles.categoryOptionIcon}>{getCategoryIcon(category)}</Text>
+                    <Text style={[
+                      styles.categoryOptionText,
+                      editForm.category === category && styles.categoryOptionTextSelected
+                    ]}>
+                      {category}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+
+              {/* Unit */}
+              <Text style={styles.fieldLabel}>Unit (Optional)</Text>
+              <TextInput
+                style={styles.textInput}
+                value={editForm.unit}
+                onChangeText={(text) => setEditForm({ ...editForm, unit: text })}
+                placeholder="e.g., lb, kg, each"
+              />
+
+              {/* Sale Toggle */}
+              <View style={styles.saleContainer}>
+                <TouchableOpacity
+                  style={[styles.saleToggle, editForm.onSale && styles.saleToggleActive]}
+                  onPress={() => setEditForm({ ...editForm, onSale: !editForm.onSale })}
+                >
+                  <Text style={[styles.saleToggleText, editForm.onSale && styles.saleToggleTextActive]}>
+                    {editForm.onSale ? '✓' : '○'} On Sale
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Original Price (if on sale) */}
+              {editForm.onSale && (
+                <>
+                  <Text style={styles.fieldLabel}>Original Price</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={editForm.originalPrice}
+                    onChangeText={(text) => setEditForm({ ...editForm, originalPrice: text })}
+                    placeholder="e.g., 3.99"
+                    keyboardType="decimal-pad"
+                  />
+                </>
+              )}
+            </ScrollView>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.modalCancelButton}
+                onPress={() => {
+                  setEditingProduct(null);
+                  setShowAddProductModal(false);
+                  resetEditForm();
+                }}
+              >
+                <Text style={styles.modalCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalSaveButton}
+                onPress={saveProductEdit}
+              >
+                <Text style={styles.modalSaveButtonText}>
+                  {editingProduct ? 'Save Changes' : 'Add Product'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Bottom Action */}
       <View style={styles.bottomContainer}>
@@ -360,23 +619,217 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 10,
     marginBottom: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'column',
+    gap: 10,
   },
   flyerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#2E7D32',
   },
+  flyerHeaderActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   productCount: {
     fontSize: 14,
     color: '#666',
   },
+  addProductButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 15,
+  },
+  addProductButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  noProductsContainer: {
+    backgroundColor: '#fff',
+    padding: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    borderStyle: 'dashed',
+    borderWidth: 2,
+    borderColor: '#ddd',
+  },
   noProductsText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#999',
-    fontStyle: 'italic',
+    marginBottom: 15,
+  },
+  addFirstProductButton: {
+    backgroundColor: '#4CAF50',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+  },
+  addFirstProductButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  productControls: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    gap: 10,
+  },
+  editButton: {
+    flex: 1,
+    backgroundColor: '#2196F3',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  editButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  deleteButton: {
+    flex: 1,
+    backgroundColor: '#F44336',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  deleteButtonText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    margin: 20,
+    borderRadius: 15,
+    maxHeight: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+    textAlign: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  modalForm: {
+    padding: 20,
+  },
+  fieldLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+    marginTop: 15,
+  },
+  textInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    backgroundColor: '#f9f9f9',
+  },
+  categoryScroll: {
+    marginVertical: 10,
+  },
+  categoryOption: {
+    alignItems: 'center',
+    padding: 10,
+    borderRadius: 8,
+    marginRight: 10,
+    minWidth: 70,
+  },
+  categoryOptionSelected: {
+    // Background color set dynamically
+  },
+  categoryOptionIcon: {
+    fontSize: 20,
+    marginBottom: 4,
+  },
+  categoryOptionText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#666',
+    textTransform: 'capitalize',
+  },
+  categoryOptionTextSelected: {
+    color: '#fff',
+  },
+  saleContainer: {
+    marginVertical: 15,
+  },
+  saleToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderWidth: 2,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    backgroundColor: '#f9f9f9',
+  },
+  saleToggleActive: {
+    borderColor: '#4CAF50',
+    backgroundColor: '#E8F5E8',
+  },
+  saleToggleText: {
+    fontSize: 16,
+    color: '#666',
+    fontWeight: 'bold',
+  },
+  saleToggleTextActive: {
+    color: '#4CAF50',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    padding: 20,
+    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  modalCancelButton: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 8,
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+  },
+  modalCancelButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#666',
+  },
+  modalSaveButton: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 8,
+    backgroundColor: '#4CAF50',
+    alignItems: 'center',
+  },
+  modalSaveButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
   },
   productCard: {
     backgroundColor: '#fff',
