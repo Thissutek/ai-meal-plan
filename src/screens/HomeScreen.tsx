@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
-import { RootStackParamList, UserPreferences } from '../App';
+import { RootStackParamList, UserPreferences } from '../../App';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Props = StackScreenProps<RootStackParamList, 'Home'>;
@@ -59,7 +59,7 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
       <StatusBar barStyle="light-content" backgroundColor="#2E7D32" />
 
       <View style={styles.header}>
-        <Text style={styles.title}>AI Meal Planner</Text>
+        <Text style={styles.title}>Home Screen</Text>
         <Text style={styles.subtitle}>
           Take photos of grocery flyers and get personalized meal plans with cost estimates
         </Text>

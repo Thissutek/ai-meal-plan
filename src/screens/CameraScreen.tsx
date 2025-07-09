@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
-import { RootStackParamList, UserPreferences } from '../App';
+import { RootStackParamList, UserPreferences } from '../../App';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';

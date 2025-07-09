@@ -10,7 +10,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
-import { RootStackParamList, UserPreferences } from '../App';
+import { RootStackParamList, UserPreferences } from '../../App';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Props = StackScreenProps<RootStackParamList, 'Preferences'>;
@@ -145,19 +145,6 @@ const PreferencesScreen: React.FC<Props> = ({ navigation }) => {
             </View>
           </View>
 
-          {/* Budget */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Weekly Budget (Optional)</Text>
-            <Text style={styles.sectionSubtitle}>What's your approximate weekly grocery budget?</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="e.g., 150"
-              value={budget}
-              onChangeText={setBudget}
-              keyboardType="numeric"
-            />
-          </View>
-
           {/* Allergies */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Allergies</Text>
@@ -216,63 +203,6 @@ const PreferencesScreen: React.FC<Props> = ({ navigation }) => {
             )}
           </View>
 
-          {/* Dietary Restrictions */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Dietary Restrictions</Text>
-            <Text style={styles.sectionSubtitle}>Select any dietary preferences</Text>
-
-            <View style={styles.tagContainer}>
-              {DIETARY_RESTRICTIONS.map((dietary) => (
-                <TouchableOpacity
-                  key={dietary}
-                  style={[
-                    styles.tag,
-                    selectedDietary.includes(dietary) && styles.tagSelected
-                  ]}
-                  onPress={() => toggleDietary(dietary)}
-                >
-                  <Text style={[
-                    styles.tagText,
-                    selectedDietary.includes(dietary) && styles.tagTextSelected
-                  ]}>
-                    {dietary}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View style={styles.customInputContainer}>
-              <TextInput
-                style={[styles.textInput, styles.customInput]}
-                placeholder="Add custom dietary restriction"
-                value={customDietary}
-                onChangeText={setCustomDietary}
-              />
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={addCustomDietary}
-              >
-                <Text style={styles.addButtonText}>Add</Text>
-              </TouchableOpacity>
-            </View>
-
-            {selectedDietary.length > 0 && (
-              <View style={styles.selectedContainer}>
-                <Text style={styles.selectedTitle}>Selected Dietary Restrictions:</Text>
-                <View style={styles.selectedTagContainer}>
-                  {selectedDietary.map((dietary) => (
-                    <TouchableOpacity
-                      key={dietary}
-                      style={styles.selectedTag}
-                      onPress={() => removeDietary(dietary)}
-                    >
-                      <Text style={styles.selectedTagText}>{dietary} ×</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            )}
-          </View>
 
         </View>
       </ScrollView>
