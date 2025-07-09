@@ -15,7 +15,6 @@ import { RootStackParamList } from '../../App';
 import {
   getAllMealPlans,
   deleteMealPlan,
-  syncLocalPlansToCloud,
   SavedMealPlan
 } from '../services/mealPlanStorage';
 import { useFocusEffect } from '@react-navigation/native';
@@ -41,7 +40,6 @@ const SavedPlansScreen: React.FC<Props> = ({ navigation }) => {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await syncLocalPlansToCloud();
     await loadSavedPlans();
     setRefreshing(false);
   };
@@ -106,13 +104,6 @@ const SavedPlansScreen: React.FC<Props> = ({ navigation }) => {
         >
           <View style={styles.planHeader}>
             <Text style={styles.planTitle}>{plan.title}</Text>
-            <View style={styles.syncStatus}>
-              {plan.isSyncedToCloud ? (
-                <Text style={styles.cloudIcon}>☁️</Text>
-              ) : (
-                <Text style={styles.localIcon}>📱</Text>
-              )}
-            </View>
           </View>
 
           <View style={styles.planStats}>
@@ -211,10 +202,10 @@ const SavedPlansScreen: React.FC<Props> = ({ navigation }) => {
           {savedPlans.length > 0 && (
             <View style={styles.syncInfo}>
               <Text style={styles.syncInfoText}>
-                ☁️ = Synced to cloud  📱 = Local only
+                All plans are stored in the cloud database
               </Text>
               <Text style={styles.syncInfoSubtext}>
-                Pull down to refresh and sync with cloud
+                Pull down to refresh and get latest data
               </Text>
             </View>
           )}
@@ -331,15 +322,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#2E7D32',
     flex: 1,
-  },
-  syncStatus: {
-    marginLeft: 10,
-  },
-  cloudIcon: {
-    fontSize: 20,
-  },
-  localIcon: {
-    fontSize: 20,
   },
   planStats: {
     flexDirection: 'row',

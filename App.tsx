@@ -123,7 +123,7 @@ export default function App(): JSX.Element {
         <Stack.Screen
           name="Home"
           component={HomeScreen}
-          options={{ title: 'AI Meal Planner' }}
+          options={{ title: 'Savyr' }}
         />
         <Stack.Screen
           name="Preferences"
