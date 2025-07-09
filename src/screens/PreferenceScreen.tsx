@@ -10,7 +10,7 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
-import { RootStackParamList, UserPreferences } from '../App';
+import { RootStackParamList, UserPreferences } from '../../App';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type Props = StackScreenProps<RootStackParamList, 'Preferences'>;
@@ -19,9 +19,6 @@ const FAMILY_SIZES = [1, 2, 3, 4, 5];
 const COMMON_ALLERGIES = [
   'Nuts', 'Dairy', 'Gluten', 'Eggs', 'Seafood', 'Soy', 'Shellfish'
 ];
-const DIETARY_RESTRICTIONS = [
-  'Vegetarian', 'Vegan', 'Keto', 'Paleo', 'Low Carb', 'Halal', 'Kosher'
-];
 
 const PreferencesScreen: React.FC<Props> = ({ navigation }) => {
   const [familySize, setFamilySize] = useState(1);
@@ -29,7 +26,6 @@ const PreferencesScreen: React.FC<Props> = ({ navigation }) => {
   const [selectedDietary, setSelectedDietary] = useState<string[]>([]);
   const [budget, setBudget] = useState('');
   const [customAllergy, setCustomAllergy] = useState('');
-  const [customDietary, setCustomDietary] = useState('');
 
   useEffect(() => {
     loadPreferences();
@@ -58,14 +54,6 @@ const PreferencesScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
-  const toggleDietary = (dietary: string) => {
-    setSelectedDietary(prev =>
-      prev.includes(dietary)
-        ? prev.filter(d => d !== dietary)
-        : [...prev, dietary]
-    );
-  };
-
   const addCustomAllergy = () => {
     if (customAllergy.trim() && !selectedAllergies.includes(customAllergy.trim())) {
       setSelectedAllergies(prev => [...prev, customAllergy.trim()]);
@@ -73,21 +61,10 @@ const PreferencesScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const addCustomDietary = () => {
-    if (customDietary.trim() && !selectedDietary.includes(customDietary.trim())) {
-      setSelectedDietary(prev => [...prev, customDietary.trim()]);
-      setCustomDietary('');
-    }
-  };
 
   const removeAllergy = (allergy: string) => {
     setSelectedAllergies(prev => prev.filter(a => a !== allergy));
   };
-
-  const removeDietary = (dietary: string) => {
-    setSelectedDietary(prev => prev.filter(d => d !== dietary));
-  };
-
   const savePreferences = async () => {
     try {
       const preferences: UserPreferences = {
@@ -145,18 +122,6 @@ const PreferencesScreen: React.FC<Props> = ({ navigation }) => {
             </View>
           </View>
 
-          {/* Budget */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Weekly Budget (Optional)</Text>
-            <Text style={styles.sectionSubtitle}>What's your approximate weekly grocery budget?</Text>
-            <TextInput
-              style={styles.textInput}
-              placeholder="e.g., 150"
-              value={budget}
-              onChangeText={setBudget}
-              keyboardType="numeric"
-            />
-          </View>
 
           {/* Allergies */}
           <View style={styles.section}>
@@ -209,63 +174,6 @@ const PreferencesScreen: React.FC<Props> = ({ navigation }) => {
                       onPress={() => removeAllergy(allergy)}
                     >
                       <Text style={styles.selectedTagText}>{allergy} ×</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            )}
-          </View>
-          {/* Dietary Restrictions */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Dietary Restrictions</Text>
-            <Text style={styles.sectionSubtitle}>Select any dietary preferences</Text>
-
-            <View style={styles.tagContainer}>
-              {DIETARY_RESTRICTIONS.map((dietary) => (
-                <TouchableOpacity
-                  key={dietary}
-                  style={[
-                    styles.tag,
-                    selectedDietary.includes(dietary) && styles.tagSelected
-                  ]}
-                  onPress={() => toggleDietary(dietary)}
-                >
-                  <Text style={[
-                    styles.tagText,
-                    selectedDietary.includes(dietary) && styles.tagTextSelected
-                  ]}>
-                    {dietary}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View style={styles.customInputContainer}>
-              <TextInput
-                style={[styles.textInput, styles.customInput]}
-                placeholder="Add custom dietary restriction"
-                value={customDietary}
-                onChangeText={setCustomDietary}
-              />
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={addCustomDietary}
-              >
-                <Text style={styles.addButtonText}>Add</Text>
-              </TouchableOpacity>
-            </View>
-
-            {selectedDietary.length > 0 && (
-              <View style={styles.selectedContainer}>
-                <Text style={styles.selectedTitle}>Selected Dietary Restrictions:</Text>
-                <View style={styles.selectedTagContainer}>
-                  {selectedDietary.map((dietary) => (
-                    <TouchableOpacity
-                      key={dietary}
-                      style={styles.selectedTag}
-                      onPress={() => removeDietary(dietary)}
-                    >
-                      <Text style={styles.selectedTagText}>{dietary} ×</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
