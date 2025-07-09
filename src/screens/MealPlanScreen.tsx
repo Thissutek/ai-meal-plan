@@ -12,17 +12,25 @@ import {
   Modal,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
-import { RootStackParamList, MealPlan, Meal } from '../../App';
+import { RootStackParamList, MealPlan, Meal, SerializableMealPlan } from '../../App';
 import { saveMealPlan } from '../services/mealPlanStorage';
 
 type Props = StackScreenProps<RootStackParamList, 'MealPlan'>;
 
 const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { mealPlan } = route.params;
+  const { mealPlan: serializedMealPlan } = route.params;
+
+  // Convert serialized meal plan back to proper MealPlan with Date objects
+  const mealPlan: MealPlan = {
+    ...serializedMealPlan,
+    savedAt: serializedMealPlan.savedAt ? new Date(serializedMealPlan.savedAt) : undefined
+  } as MealPlan;
+
   const [expandedMeal, setExpandedMeal] = useState<string | null>(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [mealPlanTitle, setMealPlanTitle] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<'meals' | 'grocery'>('meals');
 
   const toggleMealExpansion = (mealId: string) => {
     setExpandedMeal(expandedMeal === mealId ? null : mealId);
@@ -69,6 +77,83 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
     setShowSaveModal(true);
   };
 
+  // Simple grocery list generation
+  const generateGroceryList = () => {
+    const ingredients = new Map();
+
+    mealPlan.meals.forEach(meal => {
+      meal.ingredients.forEach(ingredient => {
+        const key = ingredient.name.toLowerCase();
+        if (ingredients.has(key)) {
+          const existing = ingredients.get(key);
+          existing.price += ingredient.price;
+          existing.quantity = `${existing.quantity}, ${ingredient.quantity}`;
+        } else {
+          ingredients.set(key, {
+            name: ingredient.name,
+            quantity: ingredient.quantity,
+            price: ingredient.price
+          });
+        }
+      });
+    });
+
+    return Array.from(ingredients.values());
+  };
+
+  const renderSimpleGroceryList = () => {
+    const groceryItems = generateGroceryList();
+    const totalCost = groceryItems.reduce((sum, item) => sum + item.price, 0);
+
+    return (
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.content}>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryTitle}>Grocery Shopping List</Text>
+            <Text style={styles.summarySubtitle}>
+              {groceryItems.length} items • {formatPrice(totalCost)}
+            </Text>
+          </View>
+
+          {groceryItems.map((item, index) => (
+            <View key={index} style={styles.groceryItem}>
+              <View style={styles.groceryItemContent}>
+                <Text style={styles.groceryItemName}>{item.name}</Text>
+                <Text style={styles.groceryItemQuantity}>{item.quantity}</Text>
+              </View>
+              <Text style={styles.groceryItemPrice}>{formatPrice(item.price)}</Text>
+            </View>
+          ))}
+
+          <TouchableOpacity
+            style={styles.shareGroceryButton}
+            onPress={() => shareGroceryList(groceryItems, totalCost)}
+          >
+            <Text style={styles.shareGroceryButtonText}>📤 Share Grocery List</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    );
+  };
+
+  const shareGroceryList = async (items: any[], totalCost: number) => {
+    let text = `🛒 Grocery Shopping List\n`;
+    text += `Total Cost: ${formatPrice(totalCost)}\n\n`;
+
+    items.forEach(item => {
+      text += `• ${item.quantity} ${item.name} - ${formatPrice(item.price)}\n`;
+    });
+
+    try {
+      await Share.share({
+        message: text,
+        title: 'Grocery Shopping List',
+      });
+    } catch (error) {
+      console.error('Error sharing grocery list:', error);
+    }
+  };
+
   const shareMealPlan = async () => {
     try {
       const mealPlanText = generateShareText();
@@ -80,7 +165,6 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
       console.error('Error sharing meal plan:', error);
     }
   };
-
 
   const generateShareText = (): string => {
     let text = `🍽️ AI Generated Meal Plan\n`;
@@ -174,57 +258,81 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.content}>
+      {/* Tab Navigation */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'meals' && styles.tabActive]}
+          onPress={() => setActiveTab('meals')}
+        >
+          <Text style={[styles.tabText, activeTab === 'meals' && styles.tabTextActive]}>
+            🍽️ Meal Plan
+          </Text>
+        </TouchableOpacity>
 
-          {/* Header Summary */}
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>Your Meal Plan</Text>
-            <Text style={styles.summarySubtitle}>
-              For {mealPlan.familySize} {mealPlan.familySize === 1 ? 'person' : 'people'}
-            </Text>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'grocery' && styles.tabActive]}
+          onPress={() => setActiveTab('grocery')}
+        >
+          <Text style={[styles.tabText, activeTab === 'grocery' && styles.tabTextActive]}>
+            🛒 Grocery List
+          </Text>
+        </TouchableOpacity>
+      </View>
 
-            <View style={styles.costContainer}>
-              <Text style={styles.totalCostLabel}>Total Weekly Cost:</Text>
-              <Text style={styles.totalCost}>{formatPrice(mealPlan.totalCost)}</Text>
-            </View>
-
-            <View style={styles.averageContainer}>
-              <Text style={styles.averageText}>
-                Average per person: {formatPrice(mealPlan.totalCost / mealPlan.familySize)}
+      {/* Content */}
+      {activeTab === 'meals' ? (
+        <ScrollView style={styles.scrollView}>
+          <View style={styles.content}>
+            {/* Header Summary */}
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryTitle}>Your Meal Plan</Text>
+              <Text style={styles.summarySubtitle}>
+                For {mealPlan.familySize} {mealPlan.familySize === 1 ? 'person' : 'people'}
               </Text>
-              <Text style={styles.averageText}>
-                Average per day: {formatPrice(mealPlan.totalCost / 7)}
-              </Text>
-            </View>
-          </View>
 
-          {/* Preferences Info */}
-          {(mealPlan.preferences.allergies.length > 0 ||
-            mealPlan.preferences.dietaryRestrictions.length > 0) && (
-              <View style={styles.preferencesCard}>
-                <Text style={styles.preferencesTitle}>Preferences Considered:</Text>
-                {mealPlan.preferences.allergies.length > 0 && (
-                  <Text style={styles.preferencesText}>
-                    🚫 Allergies avoided: {mealPlan.preferences.allergies.join(', ')}
-                  </Text>
-                )}
-                {mealPlan.preferences.dietaryRestrictions.length > 0 && (
-                  <Text style={styles.preferencesText}>
-                    🥗 Dietary: {mealPlan.preferences.dietaryRestrictions.join(', ')}
-                  </Text>
-                )}
+              <View style={styles.costContainer}>
+                <Text style={styles.totalCostLabel}>Total Weekly Cost:</Text>
+                <Text style={styles.totalCost}>{formatPrice(mealPlan.totalCost)}</Text>
               </View>
-            )}
 
-          {/* Meal Categories */}
-          {renderMealCategory('breakfast', 'Breakfast', '🌅')}
-          {renderMealCategory('lunch', 'Lunch', '☀️')}
-          {renderMealCategory('dinner', 'Dinner', '🌙')}
-          {renderMealCategory('snack', 'Snacks', '🍎')}
+              <View style={styles.averageContainer}>
+                <Text style={styles.averageText}>
+                  Average per person: {formatPrice(mealPlan.totalCost / mealPlan.familySize)}
+                </Text>
+                <Text style={styles.averageText}>
+                  Average per day: {formatPrice(mealPlan.totalCost / 7)}
+                </Text>
+              </View>
+            </View>
 
-        </View>
-      </ScrollView>
+            {/* Preferences Info */}
+            {(mealPlan.preferences.allergies.length > 0 ||
+              mealPlan.preferences.dietaryRestrictions.length > 0) && (
+                <View style={styles.preferencesCard}>
+                  <Text style={styles.preferencesTitle}>Preferences Considered:</Text>
+                  {mealPlan.preferences.allergies.length > 0 && (
+                    <Text style={styles.preferencesText}>
+                      🚫 Allergies avoided: {mealPlan.preferences.allergies.join(', ')}
+                    </Text>
+                  )}
+                  {mealPlan.preferences.dietaryRestrictions.length > 0 && (
+                    <Text style={styles.preferencesText}>
+                      🥗 Dietary: {mealPlan.preferences.dietaryRestrictions.join(', ')}
+                    </Text>
+                  )}
+                </View>
+              )}
+
+            {/* Meal Categories */}
+            {renderMealCategory('breakfast', 'Breakfast', '🌅')}
+            {renderMealCategory('lunch', 'Lunch', '☀️')}
+            {renderMealCategory('dinner', 'Dinner', '🌙')}
+            {renderMealCategory('snack', 'Snacks', '🍎')}
+          </View>
+        </ScrollView>
+      ) : (
+        renderSimpleGroceryList()
+      )}
 
       {/* Save Modal */}
       <Modal
@@ -300,6 +408,30 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 15,
+    alignItems: 'center',
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+  },
+  tabActive: {
+    borderBottomColor: '#4CAF50',
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#666',
+  },
+  tabTextActive: {
+    color: '#4CAF50',
   },
   scrollView: {
     flex: 1,
@@ -574,6 +706,50 @@ const styles = StyleSheet.create({
     backgroundColor: '#ccc',
   },
   saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  groceryItem: {
+    backgroundColor: '#fff',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  groceryItemContent: {
+    flex: 1,
+  },
+  groceryItemName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  groceryItemQuantity: {
+    fontSize: 14,
+    color: '#666',
+  },
+  groceryItemPrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  shareGroceryButton: {
+    backgroundColor: '#2196F3',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  shareGroceryButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',

@@ -59,7 +59,7 @@ export const saveMealPlan = async (
             family_size: mealPlan.familySize,
             preferences: mealPlan.preferences,
             meals: mealPlan.meals,
-            local_id: mealPlan.id,
+            grocery_list: mealPlan.groceryList || null,
           })
           .select("id")
           .single();
@@ -128,12 +128,13 @@ export const getCloudMealPlans = async (): Promise<SavedMealPlan[]> => {
     }
 
     return data.map((plan: any) => ({
-      id: plan.local_id || plan.id,
+      id: plan.id, // Use cloud ID as primary ID
       title: plan.title,
       meals: plan.meals,
       totalCost: plan.total_cost,
       familySize: plan.family_size,
       preferences: plan.preferences,
+      groceryList: plan.grocery_list || undefined,
       savedAt: new Date(plan.created_at),
       isSyncedToCloud: true,
       cloudId: plan.id,
@@ -219,7 +220,7 @@ export const syncLocalPlansToCloud = async (): Promise<void> => {
             family_size: plan.familySize,
             preferences: plan.preferences,
             meals: plan.meals,
-            local_id: plan.id,
+            grocery_list: plan.groceryList || null,
           })
           .select("id")
           .single();

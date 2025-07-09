@@ -69,7 +69,12 @@ const SavedPlansScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const handleViewPlan = (plan: SavedMealPlan) => {
-    navigation.navigate('MealPlan', { mealPlan: plan });
+    // Serialize the meal plan for navigation to avoid Date object issues
+    const serializedPlan = {
+      ...plan,
+      savedAt: plan.savedAt.toISOString()
+    };
+    navigation.navigate('MealPlan', { mealPlan: serializedPlan });
   };
 
   const formatDate = (date: Date): string => {

@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList, FlyerData, Product } from '../../App';
-import { generateMealPlanFromProducts } from '../services/openaiService';
+import { generateMealPlanFromProducts, serializeMealPlanForNavigation } from '../services/openaiService';
 
 type Props = StackScreenProps<RootStackParamList, 'FlyerResults'>;
 
@@ -180,7 +180,8 @@ const FlyerResultsScreen: React.FC<Props> = ({ route, navigation }) => {
 
     try {
       const mealPlan = await generateMealPlanFromProducts(allProducts, preferences);
-      navigation.navigate('MealPlan', { mealPlan });
+      const serializedMealPlan = serializeMealPlanForNavigation(mealPlan);
+      navigation.navigate('MealPlan', { mealPlan: serializedMealPlan });
     } catch (error) {
       console.error('Error generating meal plan:', error);
       Alert.alert(

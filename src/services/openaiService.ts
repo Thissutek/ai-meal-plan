@@ -373,6 +373,14 @@ export const generateMealPlanFromProducts = async (
     return createMockMealPlan(preferences);
   }
 };
+
+// Helper function to serialize meal plan for navigation
+export const serializeMealPlanForNavigation = (mealPlan: MealPlan): any => {
+  return {
+    ...mealPlan,
+    savedAt: mealPlan.savedAt ? mealPlan.savedAt.toISOString() : undefined,
+  };
+};
 const createMockMealPlan = (preferences: UserPreferences): MealPlan => {
   const mockMeals: Meal[] = [
     {
