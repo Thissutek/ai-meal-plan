@@ -11,16 +11,36 @@ import {
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList, UserPreferences } from '../../App';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getMealPlanCount } from '../services/mealPlanStorage';
 
 type Props = StackScreenProps<RootStackParamList, 'Home'>;
 
 const HomeScreen: React.FC<Props> = ({ navigation }) => {
   const [hasPreferences, setHasPreferences] = useState(false);
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
+  const [savedPlansCount, setSavedPlansCount] = useState(0);
 
   useEffect(() => {
     loadPreferences();
+    loadMealPlanCount();
   }, []);
+
+  // Reload meal plan count when screen comes into focus
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadMealPlanCount();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  const loadMealPlanCount = async () => {
+    try {
+      const count = await getMealPlanCount();
+      setSavedPlansCount(count);
+    } catch (error) {
+      console.error('Error loading meal plan count:', error);
+    }
+  };
 
   const loadPreferences = async () => {
     try {
@@ -63,6 +83,19 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
         <Text style={styles.subtitle}>
           Take photos of grocery flyers and get personalized meal plans with cost estimates
         </Text>
+
+        {/* Saved plans icon button in top right */}
+        <TouchableOpacity
+          style={styles.savedPlansIconButton}
+          onPress={() => navigation.navigate('SavedPlans')}
+        >
+          <Text style={styles.savedPlansIcon}>📋</Text>
+          {savedPlansCount > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{savedPlansCount}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
 
       <View style={styles.content}>
@@ -105,6 +138,10 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.stepNumber}>3</Text>
             <Text style={styles.stepText}>Get AI-generated meal plans with cost estimates</Text>
           </View>
+          <View style={styles.step}>
+            <Text style={styles.stepNumber}>4</Text>
+            <Text style={styles.stepText}>Save your favorite meal plans for later</Text>
+          </View>
         </View>
       </View>
 
@@ -138,6 +175,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2E7D32',
     padding: 20,
     paddingTop: 40,
+    position: 'relative',
   },
   title: {
     fontSize: 28,
@@ -151,6 +189,38 @@ const styles = StyleSheet.create({
     color: '#fff',
     textAlign: 'center',
     opacity: 0.9,
+  },
+  savedPlansIconButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 25,
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  savedPlansIcon: {
+    fontSize: 24,
+    color: '#fff',
+  },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#FF5722',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   content: {
     flex: 1,

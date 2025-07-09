@@ -8,15 +8,22 @@ import {
   SafeAreaView,
   Alert,
   Share,
+  TextInput,
+  Modal,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList, MealPlan, Meal } from '../../App';
+import { saveMealPlan } from '../services/mealPlanStorage';
+
 
 type Props = StackScreenProps<RootStackParamList, 'MealPlan'>;
 
 const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
   const { mealPlan } = route.params;
   const [expandedMeal, setExpandedMeal] = useState<string | null>(null);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [mealPlanTitle, setMealPlanTitle] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   const toggleMealExpansion = (mealId: string) => {
     setExpandedMeal(expandedMeal === mealId ? null : mealId);
@@ -30,6 +37,39 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
     return mealPlan.meals.filter(meal => meal.category === category);
   };
 
+  const handleSaveMealPlan = async () => {
+    if (!mealPlanTitle.trim()) {
+      Alert.alert('Missing Title', 'Please enter a title for your meal plan.');
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await saveMealPlan(mealPlan, mealPlanTitle.trim());
+      setShowSaveModal(false);
+      setMealPlanTitle('');
+      Alert.alert(
+        'Success!',
+        'Your meal plan has been saved successfully.',
+        [
+          { text: 'View Saved Plans', onPress: () => navigation.navigate('SavedPlans' as any) },
+          { text: 'OK', style: 'default' }
+        ]
+      );
+    } catch (error) {
+      Alert.alert('Error', 'Failed to save meal plan. Please try again.');
+      console.error('Save error:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const openSaveModal = () => {
+    const defaultTitle = `Meal Plan ${new Date().toLocaleDateString()}`;
+    setMealPlanTitle(defaultTitle);
+    setShowSaveModal(true);
+  };
+
   const shareMealPlan = async () => {
     try {
       const mealPlanText = generateShareText();
@@ -41,6 +81,7 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
       console.error('Error sharing meal plan:', error);
     }
   };
+
 
   const generateShareText = (): string => {
     let text = `🍽️ AI Generated Meal Plan\n`;
@@ -186,13 +227,63 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
         </View>
       </ScrollView>
 
+      {/* Save Modal */}
+      <Modal
+        visible={showSaveModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowSaveModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Save Meal Plan</Text>
+            <Text style={styles.modalSubtitle}>Give your meal plan a name:</Text>
+
+            <TextInput
+              style={styles.titleInput}
+              value={mealPlanTitle}
+              onChangeText={setMealPlanTitle}
+              placeholder="Enter meal plan title"
+              autoFocus={true}
+              maxLength={50}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowSaveModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton, isSaving && styles.saveButtonDisabled]}
+                onPress={handleSaveMealPlan}
+                disabled={isSaving}
+              >
+                <Text style={styles.saveButtonText}>
+                  {isSaving ? 'Saving...' : 'Save Plan'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Bottom Actions */}
       <View style={styles.actionsContainer}>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.saveActionButton]}
+          onPress={openSaveModal}
+        >
+          <Text style={styles.actionButtonText}>💾 Save Plan</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={[styles.actionButton, styles.shareButton]}
           onPress={shareMealPlan}
         >
-          <Text style={styles.actionButtonText}>📤 Share Plan</Text>
+          <Text style={styles.actionButtonText}>📤 Share</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -403,13 +494,87 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
   },
+  saveActionButton: {
+    backgroundColor: '#4CAF50',
+  },
   shareButton: {
     backgroundColor: '#2196F3',
   },
   newPlanButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#FF9800',
   },
   actionButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    margin: 20,
+    borderRadius: 15,
+    padding: 25,
+    width: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  titleInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    padding: 15,
+    fontSize: 16,
+    marginBottom: 25,
+    backgroundColor: '#f9f9f9',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  cancelButtonText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  saveButton: {
+    backgroundColor: '#4CAF50',
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  saveButtonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',

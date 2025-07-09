@@ -1,4 +1,4 @@
-import { UserPreferences, MealPlan, Meal, Ingredient } from "../App";
+import { UserPreferences, MealPlan, Meal, Ingredient } from "../../App";
 
 // You'll need to set your OpenAI API key
 const OPENAI_API_KEY =
@@ -54,7 +54,9 @@ export const processFlyers = async (
   }
 };
 
-const extractFlyerData = async (imageUris: string[]): Promise<FlyerData[]> => {
+export const extractFlyerData = async (
+  imageUris: string[],
+): Promise<FlyerData[]> => {
   const flyerDataPromises = imageUris.map(async (uri) => {
     try {
       // Convert image to base64
@@ -76,7 +78,7 @@ const extractFlyerData = async (imageUris: string[]): Promise<FlyerData[]> => {
                 content: [
                   {
                     type: "text",
-                    text: `Analyze this grocery flyer and extract product information. Return ONLY a valid JSON object with this exact structure:
+                    text: `Analyze this grocery flyer and extract ALL food and beverage product information. Return ONLY a valid JSON object with this exact structure:
 {
   "storeName": "store name if visible or Unknown Store",
   "products": [
@@ -91,10 +93,11 @@ const extractFlyerData = async (imageUris: string[]): Promise<FlyerData[]> => {
 
 Important rules:
 - Return ONLY valid JSON, no extra text
-- Include only food items with clear prices
+- Include ALL food items, beverages, snacks, and cooking ingredients with clear prices
 - Price must be a number, not a string
 - If no products found, return empty products array
-- Categories: produce, meat, dairy, pantry, snacks, beverages, other`,
+- Categories: produce, meat, dairy, pantry, snacks, beverages, frozen, bakery, deli, other
+- Include: sodas, juices, beer, wine, chips, candy, frozen meals, bread, etc.`,
                   },
                   {
                     type: "image_url",
@@ -219,11 +222,13 @@ Return ONLY a valid JSON object with this exact structure:
 
 Rules:
 - Return ONLY valid JSON, no extra text
-- Create 5-8 meals total
-- Use products from the provided list when possible
+- Create 5-8 meals total including snacks and beverages when appropriate
+- Use products from the provided list when possible (including beverages as drink pairings)
+- Include beverages, snacks, and convenience items where suitable
 - Calculate realistic costs
 - Category must be: breakfast, lunch, dinner, or snack
-- Each ingredient price should be the amount needed for the recipe`;
+- Each ingredient price should be the amount needed for the recipe
+- Consider beverages as drink options with meals or as snacks`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -339,7 +344,35 @@ const convertImageToBase64 = async (uri: string): Promise<string> => {
   }
 };
 
-// Mock meal plan for when OpenAI fails or API key is missing
+// Generate meal plan from already extracted products
+export const generateMealPlanFromProducts = async (
+  products: Product[],
+  preferences: UserPreferences,
+): Promise<MealPlan> => {
+  console.log("Generating meal plan from products:", products.length);
+
+  // Check if API key is available
+  if (!OPENAI_API_KEY || OPENAI_API_KEY === "your-api-key-here") {
+    console.log("No valid API key found, using mock data");
+    return createMockMealPlan(preferences);
+  }
+
+  try {
+    // Create fake flyer data structure for existing generateMealPlan function
+    const flyerData: FlyerData[] = [
+      {
+        storeName: "Parsed Products",
+        products: products,
+      },
+    ];
+
+    return await generateMealPlan(flyerData, preferences);
+  } catch (error) {
+    console.error("Error generating meal plan from products:", error);
+    console.log("Falling back to mock meal plan");
+    return createMockMealPlan(preferences);
+  }
+};
 const createMockMealPlan = (preferences: UserPreferences): MealPlan => {
   const mockMeals: Meal[] = [
     {

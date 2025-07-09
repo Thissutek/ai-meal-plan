@@ -19,9 +19,6 @@ const FAMILY_SIZES = [1, 2, 3, 4, 5];
 const COMMON_ALLERGIES = [
   'Nuts', 'Dairy', 'Gluten', 'Eggs', 'Seafood', 'Soy', 'Shellfish'
 ];
-const DIETARY_RESTRICTIONS = [
-  'Vegetarian', 'Vegan', 'Keto', 'Paleo', 'Low Carb', 'Halal', 'Kosher'
-];
 
 const PreferencesScreen: React.FC<Props> = ({ navigation }) => {
   const [familySize, setFamilySize] = useState(1);
@@ -29,7 +26,6 @@ const PreferencesScreen: React.FC<Props> = ({ navigation }) => {
   const [selectedDietary, setSelectedDietary] = useState<string[]>([]);
   const [budget, setBudget] = useState('');
   const [customAllergy, setCustomAllergy] = useState('');
-  const [customDietary, setCustomDietary] = useState('');
 
   useEffect(() => {
     loadPreferences();
@@ -58,14 +54,6 @@ const PreferencesScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
-  const toggleDietary = (dietary: string) => {
-    setSelectedDietary(prev =>
-      prev.includes(dietary)
-        ? prev.filter(d => d !== dietary)
-        : [...prev, dietary]
-    );
-  };
-
   const addCustomAllergy = () => {
     if (customAllergy.trim() && !selectedAllergies.includes(customAllergy.trim())) {
       setSelectedAllergies(prev => [...prev, customAllergy.trim()]);
@@ -73,21 +61,10 @@ const PreferencesScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const addCustomDietary = () => {
-    if (customDietary.trim() && !selectedDietary.includes(customDietary.trim())) {
-      setSelectedDietary(prev => [...prev, customDietary.trim()]);
-      setCustomDietary('');
-    }
-  };
 
   const removeAllergy = (allergy: string) => {
     setSelectedAllergies(prev => prev.filter(a => a !== allergy));
   };
-
-  const removeDietary = (dietary: string) => {
-    setSelectedDietary(prev => prev.filter(d => d !== dietary));
-  };
-
   const savePreferences = async () => {
     try {
       const preferences: UserPreferences = {
@@ -144,7 +121,6 @@ const PreferencesScreen: React.FC<Props> = ({ navigation }) => {
               ))}
             </View>
           </View>
-
           {/* Allergies */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Allergies</Text>
@@ -202,8 +178,6 @@ const PreferencesScreen: React.FC<Props> = ({ navigation }) => {
               </View>
             )}
           </View>
-
-
         </View>
       </ScrollView>
 
