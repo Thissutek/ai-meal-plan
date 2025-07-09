@@ -15,6 +15,7 @@ import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList, MealPlan, Meal } from '../../App';
 import { saveMealPlan } from '../services/mealPlanStorage';
 
+
 type Props = StackScreenProps<RootStackParamList, 'MealPlan'>;
 
 const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {

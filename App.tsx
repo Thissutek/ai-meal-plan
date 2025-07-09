@@ -88,7 +88,7 @@ export default function App(): JSX.Element {
         <Stack.Screen
           name="Home"
           component={HomeScreen}
-          options={{ title: 'Savyr' }}
+          options={{ title: 'Sayvr' }}
         />
         <Stack.Screen
           name="Preferences"

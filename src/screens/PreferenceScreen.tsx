@@ -121,8 +121,6 @@ const PreferencesScreen: React.FC<Props> = ({ navigation }) => {
               ))}
             </View>
           </View>
-
-
           {/* Allergies */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Allergies</Text>
