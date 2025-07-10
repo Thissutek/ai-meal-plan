@@ -17,7 +17,6 @@ import { RootStackParamList, MealPlan, Meal, SerializableMealPlan } from '../../
 import { saveMealPlan } from '../services/mealPlanStorage';
 import WeeklyMealPlanGrid from '../components/WeeklyMealPlanGrid';
 
-
 type Props = StackScreenProps<RootStackParamList, 'MealPlan'>;
 
 interface GroceryItem {
@@ -25,6 +24,7 @@ interface GroceryItem {
   name: string;
   quantity: string;
   price: number;
+  category: string;
   isChecked: boolean;
 }
 
@@ -143,6 +143,7 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
             name: ingredient.name,
             quantity: ingredient.quantity,
             price: ingredient.price,
+            category: 'other', // Add the required category property
             isChecked: false
           });
         }
@@ -179,7 +180,8 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
       const groceryListData = {
         items: items,
         totalCost: items.reduce((sum, item) => sum + item.price, 0),
-        checkedItems: []
+        checkedItems: [],
+        stores: [] // Add the required stores property to match the GroceryList interface
       };
 
       setMealPlan(prevPlan => ({
@@ -200,7 +202,8 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
     const groceryListData = {
       items: updatedList,
       totalCost: updatedList.reduce((sum, item) => sum + item.price, 0),
-      checkedItems: updatedList.filter(item => item.isChecked).map(item => item.id)
+      checkedItems: updatedList.filter(item => item.isChecked).map(item => item.id),
+      stores: [] // Add the required stores property to match the GroceryList interface
     };
 
     setMealPlan(prevPlan => ({
@@ -225,6 +228,17 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
       });
     } catch (error) {
       console.error('Error sharing grocery list:', error);
+    }
+  };
+
+  const handleDaySelected = (dayIndex: number, meals: Meal[]) => {
+    setSelectedDayIndex(dayIndex);
+    setSelectedDayMeals(meals);
+    // Automatically expand the first meal if available
+    if (meals.length > 0) {
+      setExpandedMeal(meals[0].id);
+    } else {
+      setExpandedMeal(null);
     }
   };
 
@@ -348,111 +362,21 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
-      {/* Tab Navigation */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'meals' && styles.tabActive]}
-          onPress={() => setActiveTab('meals')}
-        >
-          <Text style={[styles.tabText, activeTab === 'meals' && styles.tabTextActive]}>
-            🍽️ Meal Plan
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'grocery' && styles.tabActive]}
-          onPress={() => setActiveTab('grocery')}
-        >
-          <Text style={[styles.tabText, activeTab === 'grocery' && styles.tabTextActive]}>
-            🛒 Grocery List
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Content */}
-      {activeTab === 'meals' ? (
-        <ScrollView style={styles.scrollView}>
-          <View style={styles.content}>
-            {/* Header Summary */}
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryTitle}>Your Meal Plan</Text>
-              <Text style={styles.summarySubtitle}>
-                For {mealPlan.familySize} {mealPlan.familySize === 1 ? 'person' : 'people'}
-              </Text>
-
-              <View style={styles.costContainer}>
-                <Text style={styles.totalCostLabel}>Total Weekly Cost:</Text>
-                <Text style={styles.totalCost}>{formatPrice(mealPlan.totalCost)}</Text>
-              </View>
-
-              <View style={styles.averageContainer}>
-                <Text style={styles.averageText}>
-                  Average per person: {formatPrice(mealPlan.totalCost / mealPlan.familySize)}
-                </Text>
-                <Text style={styles.averageText}>
-                  Average per day: {formatPrice(mealPlan.totalCost / 7)}
-                </Text>
-              </View>
-            </View>
-
-            {/* Preferences Info */}
-            {(mealPlan.preferences.allergies.length > 0 ||
-              mealPlan.preferences.dietaryRestrictions.length > 0) && (
-                <View style={styles.preferencesCard}>
-                  <Text style={styles.preferencesTitle}>Preferences Considered:</Text>
-                  {mealPlan.preferences.allergies.length > 0 && (
-                    <Text style={styles.preferencesText}>
-                      🚫 Allergies avoided: {mealPlan.preferences.allergies.join(', ')}
-                    </Text>
-                  )}
-                  {mealPlan.preferences.dietaryRestrictions.length > 0 && (
-                    <Text style={styles.preferencesText}>
-                      🥗 Dietary: {mealPlan.preferences.dietaryRestrictions.join(', ')}
-                    </Text>
-                  )}
-                </View>
-              )}
-
-            {/* Meal Categories */}
-            {renderMealCategory('breakfast', 'Breakfast', '🌅')}
-            {renderMealCategory('lunch', 'Lunch', '☀️')}
-            {renderMealCategory('dinner', 'Dinner', '🌙')}
-            {renderMealCategory('snack', 'Snacks', '🍎')}
-          </View>
-        </ScrollView>
-      ) : (
-        renderGroceryList()
-      )}
-
-      {/* Save Modal */}
-  const handleDaySelected = (dayIndex: number, meals: Meal[]) => {
-        setSelectedDayIndex(dayIndex);
-      setSelectedDayMeals(meals);
-    // Automatically expand the first meal if available
-    if (meals.length > 0) {
-        setExpandedMeal(meals[0].id);
-    } else {
-        setExpandedMeal(null);
-    }
-  };
-
   const renderDayMeals = () => {
     if (selectedDayMeals.length === 0) {
       return (
-      <View style={styles.emptyDayContainer}>
-        <Text style={styles.emptyDayText}>No meals planned for this day</Text>
-      </View>
+        <View style={styles.emptyDayContainer}>
+          <Text style={styles.emptyDayText}>No meals planned for this day</Text>
+        </View>
       );
     }
 
-      const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      const dayName = daysOfWeek[selectedDayIndex];
+    const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const dayName = daysOfWeek[selectedDayIndex];
 
-      // Group meals by category for the selected day
-      const mealsByCategory = {
-        breakfast: selectedDayMeals.filter(meal => meal.category === 'breakfast'),
+    // Group meals by category for the selected day
+    const mealsByCategory = {
+      breakfast: selectedDayMeals.filter(meal => meal.category === 'breakfast'),
       lunch: selectedDayMeals.filter(meal => meal.category === 'lunch'),
       dinner: selectedDayMeals.filter(meal => meal.category === 'dinner'),
       snack: selectedDayMeals.filter(meal => meal.category === 'snack'),
@@ -461,7 +385,7 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
     // Calculate total cost for the day
     const dayTotalCost = selectedDayMeals.reduce((sum, meal) => sum + meal.cost, 0);
 
-      return (
+    return (
       <View style={styles.dayMealsContainer}>
         <View style={styles.dayHeader}>
           <Text style={styles.dayTitle}>{dayName}'s Meals</Text>
@@ -496,11 +420,102 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         )}
       </View>
-      );
+    );
   };
 
+  const renderMealsContent = () => {
+    if (showWeeklyView) {
       return (
-      <SafeAreaView style={styles.container}>
+        <View style={styles.weeklyViewContainer}>
+          <WeeklyMealPlanGrid
+            mealPlan={mealPlan}
+            onDaySelected={handleDaySelected}
+          />
+          <ScrollView style={styles.selectedDayScrollView}>
+            {renderDayMeals()}
+          </ScrollView>
+        </View>
+      );
+    }
+
+    return (
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.content}>
+          {/* Header Summary */}
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryTitle}>Your Meal Plan</Text>
+            <Text style={styles.summarySubtitle}>
+              For {mealPlan.familySize} {mealPlan.familySize === 1 ? 'person' : 'people'}
+            </Text>
+
+            <View style={styles.costContainer}>
+              <Text style={styles.totalCostLabel}>Total Weekly Cost:</Text>
+              <Text style={styles.totalCost}>{formatPrice(mealPlan.totalCost)}</Text>
+            </View>
+
+            <View style={styles.averageContainer}>
+              <Text style={styles.averageText}>
+                Average per person: {formatPrice(mealPlan.totalCost / mealPlan.familySize)}
+              </Text>
+              <Text style={styles.averageText}>
+                Average per day: {formatPrice(mealPlan.totalCost / 7)}
+              </Text>
+            </View>
+          </View>
+
+          {/* Preferences Info */}
+          {(mealPlan.preferences.allergies.length > 0 ||
+            mealPlan.preferences.dietaryRestrictions.length > 0) && (
+              <View style={styles.preferencesCard}>
+                <Text style={styles.preferencesTitle}>Preferences Considered:</Text>
+                {mealPlan.preferences.allergies.length > 0 && (
+                  <Text style={styles.preferencesText}>
+                    🚫 Allergies avoided: {mealPlan.preferences.allergies.join(', ')}
+                  </Text>
+                )}
+                {mealPlan.preferences.dietaryRestrictions.length > 0 && (
+                  <Text style={styles.preferencesText}>
+                    🥗 Dietary: {mealPlan.preferences.dietaryRestrictions.join(', ')}
+                  </Text>
+                )}
+              </View>
+            )}
+
+          {/* Meal Categories */}
+          {renderMealCategory('breakfast', 'Breakfast', '🌅')}
+          {renderMealCategory('lunch', 'Lunch', '☀️')}
+          {renderMealCategory('dinner', 'Dinner', '🌙')}
+          {renderMealCategory('snack', 'Snacks', '🍎')}
+        </View>
+      </ScrollView>
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Tab Navigation */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'meals' && styles.tabActive]}
+          onPress={() => setActiveTab('meals')}
+        >
+          <Text style={[styles.tabText, activeTab === 'meals' && styles.tabTextActive]}>
+            🍽️ Meal Plan
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'grocery' && styles.tabActive]}
+          onPress={() => setActiveTab('grocery')}
+        >
+          <Text style={[styles.tabText, activeTab === 'grocery' && styles.tabTextActive]}>
+            🛒 Grocery List
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* View Toggle for Meals Tab */}
+      {activeTab === 'meals' && (
         <View style={styles.viewToggleContainer}>
           <Text style={styles.viewToggleLabel}>Weekly View</Text>
           <Switch
@@ -511,613 +526,524 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
             value={showWeeklyView}
           />
         </View>
+      )}
 
-        {showWeeklyView ? (
-          <View style={styles.weeklyViewContainer}>
-            <WeeklyMealPlanGrid
-              mealPlan={mealPlan}
-              onDaySelected={handleDaySelected}
+      {/* Content */}
+      {activeTab === 'meals' ? renderMealsContent() : renderGroceryList()}
+
+      {/* Save Modal */}
+      <Modal
+        visible={showSaveModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowSaveModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Save Meal Plan</Text>
+            <Text style={styles.modalSubtitle}>Give your meal plan a name:</Text>
+
+            <TextInput
+              style={styles.titleInput}
+              value={mealPlanTitle}
+              onChangeText={setMealPlanTitle}
+              placeholder="Enter meal plan title"
+              autoFocus={true}
+              maxLength={50}
             />
-            <ScrollView style={styles.selectedDayScrollView}>
-              {renderDayMeals()}
-            </ScrollView>
-          </View>
-        ) : (
-          <ScrollView style={styles.scrollView}>
-            <View style={styles.summaryContainer}>
-              <Text style={styles.summaryTitle}>Meal Plan Summary</Text>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Family Size:</Text>
-                <Text style={styles.summaryValue}>
-                  {mealPlan.familySize} {mealPlan.familySize === 1 ? 'person' : 'people'}
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setShowSaveModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton, isSaving && styles.saveButtonDisabled]}
+                onPress={handleSaveMealPlan}
+                disabled={isSaving}
+              >
+                <Text style={styles.saveButtonText}>
+                  {isSaving ? 'Saving...' : 'Save Plan'}
                 </Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Total Cost:</Text>
-                <Text style={styles.summaryValue}>
-                  {formatPrice(mealPlan.totalCost)}
-                </Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Average per day:</Text>
-                <Text style={styles.summaryValue}>
-                  {formatPrice(mealPlan.totalCost / 7)}
-                </Text>
-              </View>
-
-              {mealPlan.preferences && (
-                <View style={styles.preferencesContainer}>
-                  <Text style={styles.preferencesTitle}>Preferences Applied:</Text>
-                  {mealPlan.preferences.allergies.length > 0 && (
-                    <Text style={styles.preferencesText}>
-                      Allergies: {mealPlan.preferences.allergies.join(', ')}
-                    </Text>
-                  )}
-                  {mealPlan.preferences.dietaryRestrictions.length > 0 && (
-                    <Text style={styles.preferencesText}>
-                      Dietary Restrictions: {mealPlan.preferences.dietaryRestrictions.join(', ')}
-                    </Text>
-                  )}
-                  {mealPlan.preferences.budget && (
-                    <Text style={styles.preferencesText}>
-                      Budget: {formatPrice(mealPlan.preferences.budget)}
-                    </Text>
-                  )}
-                </View>
-              )}
-            </View>
-
-            {renderMealCategory('breakfast', 'Breakfast', '🍳')}
-            {renderMealCategory('lunch', 'Lunch', '🥪')}
-            {renderMealCategory('dinner', 'Dinner', '🍽️')}
-            {renderMealCategory('snack', 'Snacks', '🍌')}
-          </ScrollView>
-        )}
-        <Modal
-          visible={showSaveModal}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setShowSaveModal(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Save Meal Plan</Text>
-              <Text style={styles.modalSubtitle}>Give your meal plan a name:</Text>
-
-              <TextInput
-                style={styles.titleInput}
-                value={mealPlanTitle}
-                onChangeText={setMealPlanTitle}
-                placeholder="Enter meal plan title"
-                autoFocus={true}
-                maxLength={50}
-              />
-
-              <View style={styles.modalButtons}>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.cancelButton]}
-                  onPress={() => setShowSaveModal(false)}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.saveButton, isSaving && styles.saveButtonDisabled]}
-                  onPress={handleSaveMealPlan}
-                  disabled={isSaving}
-                >
-                  <Text style={styles.saveButtonText}>
-                    {isSaving ? 'Saving...' : 'Save Plan'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+              </TouchableOpacity>
             </View>
           </View>
-        </Modal>
-
-        {/* Bottom Actions */}
-        <View style={styles.actionsContainer}>
-          <TouchableOpacity
-            style={[styles.actionButton, styles.saveActionButton]}
-            onPress={openSaveModal}
-          >
-            <Text style={styles.actionButtonText}>💾 Save Plan</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionButton, styles.shareButton]}
-            onPress={shareMealPlan}
-          >
-            <Text style={styles.actionButtonText}>📤 Share</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.actionButton, styles.newPlanButton]}
-            onPress={() => navigation.navigate('Camera')}
-          >
-            <Text style={styles.actionButtonText}>🆕 New Plan</Text>
-          </TouchableOpacity>
         </View>
-      </SafeAreaView>
-      );
+      </Modal>
+
+      {/* Bottom Actions */}
+      <View style={styles.actionsContainer}>
+        <TouchableOpacity
+          style={[styles.actionButton, styles.saveActionButton]}
+          onPress={openSaveModal}
+        >
+          <Text style={styles.actionButtonText}>💾 Save Plan</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionButton, styles.shareButton]}
+          onPress={shareMealPlan}
+        >
+          <Text style={styles.actionButtonText}>📤 Share</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionButton, styles.newPlanButton]}
+          onPress={() => navigation.navigate('Camera')}
+        >
+          <Text style={styles.actionButtonText}>🆕 New Plan</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
 };
 
-      const styles = StyleSheet.create({
-        container: {
-        flex: 1,
-      backgroundColor: '#f5f5f5',
-  },
-      tabContainer: {
-        flexDirection: 'row',
-      backgroundColor: '#fff',
-      borderBottomWidth: 1,
-      borderBottomColor: '#eee',
-  },
-      tab: {
-        flex: 1,
-      paddingVertical: 15,
-      alignItems: 'center',
-      borderBottomWidth: 3,
-      borderBottomColor: 'transparent',
-  },
-      tabActive: {
-        borderBottomColor: '#4CAF50',
-  },
-      tabText: {
-        fontSize: 16,
-      fontWeight: 'bold',
-      color: '#666',
-  },
-      tabTextActive: {
-        color: '#4CAF50',
-  },
-      scrollView: {
-        flex: 1,
-  },
-      summaryContainer: {
-        backgroundColor: '#fff',
-      padding: 15,
-      borderRadius: 10,
-      marginHorizontal: 15,
-      marginTop: 15,
-      marginBottom: 20,
-      shadowColor: '#000',
-      shadowOffset: {width: 0, height: 1 },
-      shadowOpacity: 0.1,
-      shadowRadius: 2,
-      elevation: 2,
-  },
-      summaryRow: {
-        flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginBottom: 8,
-  },
-      summaryLabel: {
-        fontSize: 16,
-      color: '#555',
-  },
-      summaryValue: {
-        fontSize: 16,
-      fontWeight: 'bold',
-      color: '#2E7D32',
-  },
-      preferencesContainer: {
-        marginTop: 15,
-      paddingTop: 15,
-      borderTopWidth: 1,
-      borderTopColor: '#eee',
-  },
-      content: {
-        padding: 20,
-  },
-      summaryCard: {
-        backgroundColor: '#fff',
-      padding: 20,
-      borderRadius: 15,
-      marginBottom: 20,
-      shadowColor: '#000',
-      shadowOffset: {width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 3,
-  },
-      summaryTitle: {
-        fontSize: 24,
-      fontWeight: 'bold',
-      color: '#2E7D32',
-      textAlign: 'center',
-      marginBottom: 5,
-  },
-      summarySubtitle: {
-        fontSize: 16,
-      color: '#666',
-      textAlign: 'center',
-      marginBottom: 20,
-  },
-      costContainer: {
-        flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 15,
-      paddingVertical: 10,
-      borderTopWidth: 1,
-      borderBottomWidth: 1,
-      borderColor: '#eee',
-  },
-      totalCostLabel: {
-        fontSize: 18,
-      fontWeight: 'bold',
-      color: '#333',
-  },
-      totalCost: {
-        fontSize: 24,
-      fontWeight: 'bold',
-      color: '#4CAF50',
-  },
-      averageContainer: {
-        alignItems: 'center',
-  },
-      averageText: {
-        fontSize: 14,
-      color: '#666',
-      marginBottom: 2,
-  },
-      preferencesCard: {
-        backgroundColor: '#E8F5E8',
-      padding: 15,
-      borderRadius: 10,
-      marginBottom: 20,
-      borderLeftWidth: 4,
-      borderLeftColor: '#4CAF50',
-  },
-      preferencesTitle: {
-        fontSize: 16,
-      fontWeight: 'bold',
-      color: '#2E7D32',
-      marginBottom: 8,
-  },
-      preferencesText: {
-        fontSize: 14,
-      color: '#333',
-      marginBottom: 4,
-  },
-      categorySection: {
-        marginBottom: 25,
-  },
-      categoryHeader: {
-        flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 15,
-      paddingBottom: 10,
-      borderBottomWidth: 2,
-      borderBottomColor: '#4CAF50',
-  },
-      categoryTitle: {
-        fontSize: 20,
-      fontWeight: 'bold',
-      color: '#2E7D32',
-  },
-      categoryTotal: {
-        fontSize: 18,
-      fontWeight: 'bold',
-      color: '#4CAF50',
-  },
-      mealCard: {
-        backgroundColor: '#fff',
-      borderRadius: 10,
-      marginBottom: 10,
-      shadowColor: '#000',
-      shadowOffset: {width: 0, height: 1 },
-      shadowOpacity: 0.05,
-      shadowRadius: 2,
-      elevation: 2,
-  },
-      mealHeader: {
-        flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: 15,
-  },
-      mealTitleContainer: {
-        flex: 1,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginRight: 10,
-  },
-      mealName: {
-        fontSize: 16,
-      fontWeight: 'bold',
-      color: '#333',
-      flex: 1,
-  },
-      mealCost: {
-        fontSize: 16,
-      fontWeight: 'bold',
-      color: '#4CAF50',
-  },
-      expandIcon: {
-        fontSize: 16,
-      color: '#666',
-  },
-      mealDetails: {
-        paddingHorizontal: 15,
-      paddingBottom: 15,
-      borderTopWidth: 1,
-      borderTopColor: '#f0f0f0',
-  },
-      ingredientsSection: {
-        marginBottom: 15,
-  },
-      sectionTitle: {
-        fontSize: 14,
-      fontWeight: 'bold',
-      color: '#2E7D32',
-      marginBottom: 8,
-      marginTop: 5,
-  },
-      ingredientRow: {
-        flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 4,
-  },
-      ingredientText: {
-        fontSize: 14,
-      color: '#333',
-      flex: 1,
-  },
-      ingredientPrice: {
-        fontSize: 14,
-      color: '#666',
-      fontWeight: 'bold',
-  },
-      instructionsSection: {
-        marginTop: 10,
-  },
-      instructionText: {
-        fontSize: 14,
-      color: '#333',
-      marginBottom: 6,
-      lineHeight: 20,
-  },
-      groceryItem: {
-        backgroundColor: '#fff',
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: 15,
-      borderRadius: 10,
-      marginBottom: 8,
-      shadowColor: '#000',
-      shadowOffset: {width: 0, height: 1 },
-      shadowOpacity: 0.05,
-      shadowRadius: 2,
-      elevation: 2,
-  },
-      groceryItemChecked: {
-        backgroundColor: '#f0f9f0',
-      opacity: 0.8,
-  },
-      groceryCheckbox: {
-        marginRight: 15,
-      width: 30,
-      alignItems: 'center',
-  },
-      checkboxText: {
-        fontSize: 20,
-      color: '#4CAF50',
-      fontWeight: 'bold',
-  },
-      groceryItemContent: {
-        flex: 1,
-  },
-      groceryItemName: {
-        fontSize: 16,
-      fontWeight: 'bold',
-      color: '#333',
-      marginBottom: 4,
-  },
-      groceryItemNameChecked: {
-        textDecorationLine: 'line-through',
-      color: '#999',
-  },
-      groceryItemQuantity: {
-        fontSize: 14,
-      color: '#666',
-  },
-      groceryItemQuantityChecked: {
-        textDecorationLine: 'line-through',
-      color: '#999',
-  },
-      groceryItemPrice: {
-        fontSize: 16,
-      fontWeight: 'bold',
-      color: '#4CAF50',
-  },
-      groceryItemPriceChecked: {
-        textDecorationLine: 'line-through',
-      color: '#999',
-  },
-      shareGroceryButton: {
-        backgroundColor: '#2196F3',
-      padding: 15,
-      borderRadius: 10,
-      alignItems: 'center',
-      marginTop: 20,
-  },
-      shareGroceryButtonText: {
-        color: '#fff',
-      fontSize: 16,
-      fontWeight: 'bold',
-  },
-      actionsContainer: {
-        flexDirection: 'row',
-      padding: 20,
-      backgroundColor: '#fff',
-      borderTopWidth: 1,
-      borderTopColor: '#eee',
-      gap: 10,
-  },
-      actionButton: {
-        flex: 1,
-      padding: 15,
-      borderRadius: 10,
-      alignItems: 'center',
-  },
-      saveActionButton: {
-        backgroundColor: '#4CAF50',
-  },
-      shareButton: {
-        backgroundColor: '#2196F3',
-  },
-      newPlanButton: {
-        backgroundColor: '#FF9800',
-  },
-      actionButtonText: {
-        color: '#fff',
-      fontSize: 14,
-      fontWeight: 'bold',
-  },
-      modalOverlay: {
-        flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      justifyContent: 'center',
-      alignItems: 'center',
-  },
-      modalContent: {
-        backgroundColor: '#fff',
-      margin: 20,
-      borderRadius: 15,
-      padding: 25,
-      width: '85%',
-      shadowColor: '#000',
-      shadowOffset: {width: 0, height: 2 },
-      shadowOpacity: 0.25,
-      shadowRadius: 4,
-      elevation: 5,
-  },
-      modalTitle: {
-        fontSize: 22,
-      fontWeight: 'bold',
-      color: '#2E7D32',
-      textAlign: 'center',
-      marginBottom: 10,
-  },
-      modalSubtitle: {
-        fontSize: 16,
-      color: '#666',
-      textAlign: 'center',
-      marginBottom: 20,
-  },
-      titleInput: {
-        borderWidth: 1,
-      borderColor: '#ddd',
-      borderRadius: 10,
-      padding: 15,
-      fontSize: 16,
-      marginBottom: 25,
-      backgroundColor: '#f9f9f9',
-  },
-      modalButtons: {
-        flexDirection: 'row',
-      gap: 10,
-  },
-      modalButton: {
-        flex: 1,
-      padding: 15,
-      borderRadius: 10,
-      alignItems: 'center',
-  },
-      cancelButton: {
-        backgroundColor: '#f5f5f5',
-      borderWidth: 1,
-      borderColor: '#ddd',
-  },
-      cancelButtonText: {
-        color: '#666',
-      fontSize: 16,
-      fontWeight: 'bold',
-  },
-      saveButton: {
-        backgroundColor: '#4CAF50',
-  },
-      saveButtonDisabled: {
-        backgroundColor: '#ccc',
-  },
-      saveButtonText: {
-        color: '#fff',
-      fontSize: 16,
-      fontWeight: 'bold',
-  },
-      viewToggleContainer: {
-        flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'flex-end',
-      paddingHorizontal: 20,
-      paddingVertical: 10,
-      backgroundColor: '#f9f9f9',
-      borderBottomWidth: 1,
-      borderBottomColor: '#eee',
-  },
-      viewToggleLabel: {
-        marginRight: 10,
-      fontSize: 16,
-      color: '#333',
-  },
-      weeklyViewContainer: {
-        flex: 1,
-  },
-      selectedDayScrollView: {
-        flex: 1,
-      backgroundColor: '#f9f9f9',
-  },
-      dayMealsContainer: {
-        padding: 15,
-  },
-      dayHeader: {
-        flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 15,
-      paddingBottom: 8,
-      borderBottomWidth: 1,
-      borderBottomColor: '#e0e0e0',
-  },
-      dayTitle: {
-        fontSize: 20,
-      fontWeight: 'bold',
-      color: '#2E7D32',
-      textAlign: 'left',
-  },
-      dayTotalCost: {
-        fontSize: 18,
-      fontWeight: 'bold',
-      color: '#4CAF50',
-  },
-      mealCategorySection: {
-        marginBottom: 20,
-  },
-      mealCategoryTitle: {
-        fontSize: 16,
-      fontWeight: 'bold',
-      color: '#2E7D32',
-      marginBottom: 10,
-      paddingBottom: 5,
-      borderBottomWidth: 1,
-      borderBottomColor: '#f0f0f0',
-  },
-      emptyDayContainer: {
-        flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 20,
-  },
-      emptyDayText: {
-        fontSize: 16,
-      color: '#666',
-      textAlign: 'center',
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 15,
+    alignItems: 'center',
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+  },
+  tabActive: {
+    borderBottomColor: '#4CAF50',
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#666',
+  },
+  tabTextActive: {
+    color: '#4CAF50',
+  },
+  viewToggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: '#f9f9f9',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  viewToggleLabel: {
+    marginRight: 10,
+    fontSize: 16,
+    color: '#333',
+  },
+  weeklyViewContainer: {
+    flex: 1,
+  },
+  selectedDayScrollView: {
+    flex: 1,
+    backgroundColor: '#f9f9f9',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  content: {
+    padding: 20,
+  },
+  summaryCard: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 15,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  summaryTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+    textAlign: 'center',
+    marginBottom: 5,
+  },
+  summarySubtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  costContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: '#eee',
+  },
+  totalCostLabel: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  totalCost: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  averageContainer: {
+    alignItems: 'center',
+  },
+  averageText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 2,
+  },
+  preferencesCard: {
+    backgroundColor: '#E8F5E8',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4CAF50',
+  },
+  preferencesTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+    marginBottom: 8,
+  },
+  preferencesText: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 4,
+  },
+  categorySection: {
+    marginBottom: 25,
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+    paddingBottom: 10,
+    borderBottomWidth: 2,
+    borderBottomColor: '#4CAF50',
+  },
+  categoryTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+  },
+  categoryTotal: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  mealCard: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  mealHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 15,
+  },
+  mealTitleContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  mealName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    flex: 1,
+  },
+  mealCost: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  expandIcon: {
+    fontSize: 16,
+    color: '#666',
+  },
+  mealDetails: {
+    paddingHorizontal: 15,
+    paddingBottom: 15,
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  ingredientsSection: {
+    marginBottom: 15,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+    marginBottom: 8,
+    marginTop: 5,
+  },
+  ingredientRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  ingredientText: {
+    fontSize: 14,
+    color: '#333',
+    flex: 1,
+  },
+  ingredientPrice: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: 'bold',
+  },
+  instructionsSection: {
+    marginTop: 10,
+  },
+  instructionText: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 6,
+    lineHeight: 20,
+  },
+  dayMealsContainer: {
+    padding: 15,
+  },
+  dayHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  dayTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+    textAlign: 'left',
+  },
+  dayTotalCost: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  mealCategorySection: {
+    marginBottom: 20,
+  },
+  mealCategoryTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+    marginBottom: 10,
+    paddingBottom: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  emptyDayContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyDayText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+  },
+  groceryItem: {
+    backgroundColor: '#fff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  groceryItemChecked: {
+    backgroundColor: '#f0f9f0',
+    opacity: 0.8,
+  },
+  groceryCheckbox: {
+    marginRight: 15,
+    width: 30,
+    alignItems: 'center',
+  },
+  checkboxText: {
+    fontSize: 20,
+    color: '#4CAF50',
+    fontWeight: 'bold',
+  },
+  groceryItemContent: {
+    flex: 1,
+  },
+  groceryItemName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  groceryItemNameChecked: {
+    textDecorationLine: 'line-through',
+    color: '#999',
+  },
+  groceryItemQuantity: {
+    fontSize: 14,
+    color: '#666',
+  },
+  groceryItemQuantityChecked: {
+    textDecorationLine: 'line-through',
+    color: '#999',
+  },
+  groceryItemPrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  groceryItemPriceChecked: {
+    textDecorationLine: 'line-through',
+    color: '#999',
+  },
+  shareGroceryButton: {
+    backgroundColor: '#2196F3',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  shareGroceryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  actionsContainer: {
+    flexDirection: 'row',
+    padding: 20,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    gap: 10,
+  },
+  actionButton: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  saveActionButton: {
+    backgroundColor: '#4CAF50',
+  },
+  shareButton: {
+    backgroundColor: '#2196F3',
+  },
+  newPlanButton: {
+    backgroundColor: '#FF9800',
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    margin: 20,
+    borderRadius: 15,
+    padding: 25,
+    width: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  modalSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  titleInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 10,
+    padding: 15,
+    fontSize: 16,
+    marginBottom: 25,
+    backgroundColor: '#f9f9f9',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  cancelButtonText: {
+    color: '#666',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  saveButton: {
+    backgroundColor: '#4CAF50',
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 
-      export default MealPlanScreen;
+export default MealPlanScreen;
