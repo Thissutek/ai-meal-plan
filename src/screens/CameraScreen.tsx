@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
+  BackHandler,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList, UserPreferences } from '../../App';
@@ -16,6 +17,7 @@ import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { extractFlyerData } from '../services/openaiService';
+import ProcessingModal from '../components/ProcessingModal';
 
 type Props = StackScreenProps<RootStackParamList, 'Camera'>;
 
@@ -31,12 +33,52 @@ const CameraScreen: React.FC<Props> = ({ navigation }) => {
   const [cameraRef, setCameraRef] = useState<CameraView | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingMessage, setProcessingMessage] = useState('Processing your flyers...');
 
   useEffect(() => {
     if (!permission) {
       requestPermission();
     }
   }, [permission, requestPermission]);
+
+  // Handle back button press during processing
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (isProcessing) {
+        // Prevent going back while processing
+        Alert.alert(
+          'Processing in Progress',
+          'Please wait until your flyers are fully processed.'
+        );
+        return true; // Prevent default behavior
+      }
+      return false; // Allow default behavior
+    });
+
+    return () => backHandler.remove();
+  }, [isProcessing]);
+  
+  // Prevent navigation while processing
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e) => {
+      if (!isProcessing) {
+        // If not processing, allow navigation
+        return;
+      }
+
+      // Prevent navigation while processing
+      e.preventDefault();
+      
+      // Alert the user
+      Alert.alert(
+        'Processing in Progress',
+        'Please wait until your flyers are fully processed.',
+        [{ text: 'OK' }]
+      );
+    });
+
+    return unsubscribe;
+  }, [navigation, isProcessing]);
 
   const takePicture = async () => {
     if (cameraRef) {
@@ -94,6 +136,7 @@ const CameraScreen: React.FC<Props> = ({ navigation }) => {
     }
 
     setIsProcessing(true);
+    setProcessingMessage('Preparing your flyers for analysis...');
 
     try {
       // Load user preferences
@@ -109,8 +152,12 @@ const CameraScreen: React.FC<Props> = ({ navigation }) => {
       // Extract flyer data from images
       const imageUris = capturedImages.map(img => img.uri);
       console.log('About to extract flyer data from', imageUris.length, 'images');
+      setProcessingMessage(`Analyzing ${imageUris.length} flyer${imageUris.length > 1 ? 's' : ''}...`);
+      
       const flyerData = await extractFlyerData(imageUris);
       console.log('Extracted flyer data:', flyerData);
+      
+      setProcessingMessage('Processing complete! Preparing results...');
 
       // Navigate to flyer results screen to show parsed data
       console.log('Navigating to FlyerResults screen');
@@ -157,7 +204,9 @@ const CameraScreen: React.FC<Props> = ({ navigation }) => {
   if (showCamera) {
     return (
       <SafeAreaView style={styles.container}>
-        {/* Camera view with no children */}
+        {/* Processing Modal */}
+        <ProcessingModal visible={isProcessing} message={processingMessage} />
+        
         <CameraView
           style={styles.camera}
           facing={facing}
@@ -195,6 +244,9 @@ const CameraScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Processing Modal */}
+      <ProcessingModal visible={isProcessing} message={processingMessage} />
+      
       <ScrollView style={styles.scrollView}>
         <View style={styles.content}>
           <View style={styles.header}>
