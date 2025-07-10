@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,18 +12,36 @@ import {
   Modal,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
-import { RootStackParamList, MealPlan, Meal } from '../../App';
+import { RootStackParamList, MealPlan, Meal, SerializableMealPlan } from '../../App';
 import { saveMealPlan } from '../services/mealPlanStorage';
 
 
 type Props = StackScreenProps<RootStackParamList, 'MealPlan'>;
 
+interface GroceryItem {
+  id: string;
+  name: string;
+  quantity: string;
+  price: number;
+  isChecked: boolean;
+}
+
 const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { mealPlan } = route.params;
+  const { mealPlan: serializedMealPlan } = route.params;
+
+  // Convert serialized meal plan back to proper MealPlan with Date objects
+  const initialMealPlan: MealPlan = {
+    ...serializedMealPlan,
+    savedAt: serializedMealPlan.savedAt ? new Date(serializedMealPlan.savedAt) : undefined
+  } as MealPlan;
+
+  const [mealPlan, setMealPlan] = useState<MealPlan>(initialMealPlan);
   const [expandedMeal, setExpandedMeal] = useState<string | null>(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [mealPlanTitle, setMealPlanTitle] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState<'meals' | 'grocery'>('meals');
+  const [groceryList, setGroceryList] = useState<GroceryItem[]>([]);
 
   const toggleMealExpansion = (mealId: string) => {
     setExpandedMeal(expandedMeal === mealId ? null : mealId);
@@ -82,7 +100,6 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   };
 
-
   const generateShareText = (): string => {
     let text = `🍽️ AI Generated Meal Plan\n`;
     text += `For ${mealPlan.familySize} ${mealPlan.familySize === 1 ? 'person' : 'people'}\n`;
@@ -101,6 +118,109 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
     });
 
     return text;
+  };
+
+  // Generate grocery list from meal plan ingredients
+  const generateGroceryList = (): GroceryItem[] => {
+    const ingredients = new Map<string, GroceryItem>();
+
+    mealPlan.meals.forEach(meal => {
+      meal.ingredients.forEach(ingredient => {
+        const key = ingredient.name.toLowerCase().trim();
+
+        if (ingredients.has(key)) {
+          const existing = ingredients.get(key)!;
+          existing.price += ingredient.price;
+          existing.quantity = combineQuantities(existing.quantity, ingredient.quantity);
+        } else {
+          ingredients.set(key, {
+            id: `grocery_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            name: ingredient.name,
+            quantity: ingredient.quantity,
+            price: ingredient.price,
+            isChecked: false
+          });
+        }
+      });
+    });
+
+    return Array.from(ingredients.values());
+  };
+
+  const combineQuantities = (qty1: string, qty2: string): string => {
+    // Simple quantity combination - could be enhanced with unit parsing
+    const num1 = parseFloat(qty1);
+    const num2 = parseFloat(qty2);
+
+    if (!isNaN(num1) && !isNaN(num2)) {
+      const unit1 = qty1.replace(num1.toString(), '').trim();
+      const unit2 = qty2.replace(num2.toString(), '').trim();
+
+      if (unit1 === unit2) {
+        return `${(num1 + num2)} ${unit1}`;
+      }
+    }
+
+    return `${qty1}, ${qty2}`;
+  };
+
+  // Generate grocery list when switching to grocery tab
+  useEffect(() => {
+    if (activeTab === 'grocery' && groceryList.length === 0) {
+      const items = generateGroceryList();
+      setGroceryList(items);
+
+      // Update meal plan with grocery list data
+      const groceryListData = {
+        items: items,
+        totalCost: items.reduce((sum, item) => sum + item.price, 0),
+        checkedItems: []
+      };
+
+      setMealPlan(prevPlan => ({
+        ...prevPlan,
+        groceryList: groceryListData
+      }));
+    }
+  }, [activeTab]);
+
+  const toggleGroceryItem = (itemId: string) => {
+    const updatedList = groceryList.map(item =>
+      item.id === itemId ? { ...item, isChecked: !item.isChecked } : item
+    );
+
+    setGroceryList(updatedList);
+
+    // Update meal plan with new grocery list state
+    const groceryListData = {
+      items: updatedList,
+      totalCost: updatedList.reduce((sum, item) => sum + item.price, 0),
+      checkedItems: updatedList.filter(item => item.isChecked).map(item => item.id)
+    };
+
+    setMealPlan(prevPlan => ({
+      ...prevPlan,
+      groceryList: groceryListData
+    }));
+  };
+
+  const shareGroceryList = async (items: GroceryItem[], totalCost: number) => {
+    let text = `🛒 Grocery Shopping List\n`;
+    text += `Total Cost: ${formatPrice(totalCost)}\n\n`;
+
+    items.forEach(item => {
+      const status = item.isChecked ? '✓' : '○';
+      text += `${status} ${item.quantity} ${item.name} - ${formatPrice(item.price)}\n`;
+    });
+
+    try {
+      await Share.share({
+        message: text,
+        title: 'Grocery Shopping List',
+      });
+    } catch (error) {
+      console.error('Error sharing grocery list:', error);
+    }
   };
 
   const renderMeal = (meal: Meal) => {
@@ -159,7 +279,7 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
     const categoryTotal = meals.reduce((sum, meal) => sum + meal.cost, 0);
 
     return (
-      <View style={styles.categorySection}>
+      <View key={category} style={styles.categorySection}>
         <View style={styles.categoryHeader}>
           <Text style={styles.categoryTitle}>
             {icon} {displayName}
@@ -173,59 +293,134 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   };
 
-  return (
-    <SafeAreaView style={styles.container}>
+  const renderGroceryList = () => {
+    const items = groceryList.length > 0 ? groceryList : generateGroceryList();
+    const totalCost = items.reduce((sum, item) => sum + item.price, 0);
+    const checkedCount = items.filter(item => item.isChecked).length;
+
+    return (
       <ScrollView style={styles.scrollView}>
         <View style={styles.content}>
-
-          {/* Header Summary */}
           <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>Your Meal Plan</Text>
+            <Text style={styles.summaryTitle}>Grocery Shopping List</Text>
             <Text style={styles.summarySubtitle}>
-              For {mealPlan.familySize} {mealPlan.familySize === 1 ? 'person' : 'people'}
+              {checkedCount}/{items.length} items checked • {formatPrice(totalCost)}
             </Text>
-
-            <View style={styles.costContainer}>
-              <Text style={styles.totalCostLabel}>Total Weekly Cost:</Text>
-              <Text style={styles.totalCost}>{formatPrice(mealPlan.totalCost)}</Text>
-            </View>
-
-            <View style={styles.averageContainer}>
-              <Text style={styles.averageText}>
-                Average per person: {formatPrice(mealPlan.totalCost / mealPlan.familySize)}
-              </Text>
-              <Text style={styles.averageText}>
-                Average per day: {formatPrice(mealPlan.totalCost / 7)}
-              </Text>
-            </View>
           </View>
 
-          {/* Preferences Info */}
-          {(mealPlan.preferences.allergies.length > 0 ||
-            mealPlan.preferences.dietaryRestrictions.length > 0) && (
-              <View style={styles.preferencesCard}>
-                <Text style={styles.preferencesTitle}>Preferences Considered:</Text>
-                {mealPlan.preferences.allergies.length > 0 && (
-                  <Text style={styles.preferencesText}>
-                    🚫 Allergies avoided: {mealPlan.preferences.allergies.join(', ')}
-                  </Text>
-                )}
-                {mealPlan.preferences.dietaryRestrictions.length > 0 && (
-                  <Text style={styles.preferencesText}>
-                    🥗 Dietary: {mealPlan.preferences.dietaryRestrictions.join(', ')}
-                  </Text>
-                )}
+          {items.map((item) => (
+            <TouchableOpacity
+              key={item.id}
+              style={[styles.groceryItem, item.isChecked && styles.groceryItemChecked]}
+              onPress={() => toggleGroceryItem(item.id)}
+            >
+              <View style={styles.groceryCheckbox}>
+                <Text style={styles.checkboxText}>
+                  {item.isChecked ? '✓' : '○'}
+                </Text>
               </View>
-            )}
+              <View style={styles.groceryItemContent}>
+                <Text style={[styles.groceryItemName, item.isChecked && styles.groceryItemNameChecked]}>
+                  {item.name}
+                </Text>
+                <Text style={[styles.groceryItemQuantity, item.isChecked && styles.groceryItemQuantityChecked]}>
+                  {item.quantity}
+                </Text>
+              </View>
+              <Text style={[styles.groceryItemPrice, item.isChecked && styles.groceryItemPriceChecked]}>
+                {formatPrice(item.price)}
+              </Text>
+            </TouchableOpacity>
+          ))}
 
-          {/* Meal Categories */}
-          {renderMealCategory('breakfast', 'Breakfast', '🌅')}
-          {renderMealCategory('lunch', 'Lunch', '☀️')}
-          {renderMealCategory('dinner', 'Dinner', '🌙')}
-          {renderMealCategory('snack', 'Snacks', '🍎')}
-
+          <TouchableOpacity
+            style={styles.shareGroceryButton}
+            onPress={() => shareGroceryList(items, totalCost)}
+          >
+            <Text style={styles.shareGroceryButtonText}>📤 Share Grocery List</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
+    );
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Tab Navigation */}
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'meals' && styles.tabActive]}
+          onPress={() => setActiveTab('meals')}
+        >
+          <Text style={[styles.tabText, activeTab === 'meals' && styles.tabTextActive]}>
+            🍽️ Meal Plan
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.tab, activeTab === 'grocery' && styles.tabActive]}
+          onPress={() => setActiveTab('grocery')}
+        >
+          <Text style={[styles.tabText, activeTab === 'grocery' && styles.tabTextActive]}>
+            🛒 Grocery List
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Content */}
+      {activeTab === 'meals' ? (
+        <ScrollView style={styles.scrollView}>
+          <View style={styles.content}>
+            {/* Header Summary */}
+            <View style={styles.summaryCard}>
+              <Text style={styles.summaryTitle}>Your Meal Plan</Text>
+              <Text style={styles.summarySubtitle}>
+                For {mealPlan.familySize} {mealPlan.familySize === 1 ? 'person' : 'people'}
+              </Text>
+
+              <View style={styles.costContainer}>
+                <Text style={styles.totalCostLabel}>Total Weekly Cost:</Text>
+                <Text style={styles.totalCost}>{formatPrice(mealPlan.totalCost)}</Text>
+              </View>
+
+              <View style={styles.averageContainer}>
+                <Text style={styles.averageText}>
+                  Average per person: {formatPrice(mealPlan.totalCost / mealPlan.familySize)}
+                </Text>
+                <Text style={styles.averageText}>
+                  Average per day: {formatPrice(mealPlan.totalCost / 7)}
+                </Text>
+              </View>
+            </View>
+
+            {/* Preferences Info */}
+            {(mealPlan.preferences.allergies.length > 0 ||
+              mealPlan.preferences.dietaryRestrictions.length > 0) && (
+                <View style={styles.preferencesCard}>
+                  <Text style={styles.preferencesTitle}>Preferences Considered:</Text>
+                  {mealPlan.preferences.allergies.length > 0 && (
+                    <Text style={styles.preferencesText}>
+                      🚫 Allergies avoided: {mealPlan.preferences.allergies.join(', ')}
+                    </Text>
+                  )}
+                  {mealPlan.preferences.dietaryRestrictions.length > 0 && (
+                    <Text style={styles.preferencesText}>
+                      🥗 Dietary: {mealPlan.preferences.dietaryRestrictions.join(', ')}
+                    </Text>
+                  )}
+                </View>
+              )}
+
+            {/* Meal Categories */}
+            {renderMealCategory('breakfast', 'Breakfast', '🌅')}
+            {renderMealCategory('lunch', 'Lunch', '☀️')}
+            {renderMealCategory('dinner', 'Dinner', '🌙')}
+            {renderMealCategory('snack', 'Snacks', '🍎')}
+          </View>
+        </ScrollView>
+      ) : (
+        renderGroceryList()
+      )}
 
       {/* Save Modal */}
       <Modal
@@ -301,6 +496,30 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 15,
+    alignItems: 'center',
+    borderBottomWidth: 3,
+    borderBottomColor: 'transparent',
+  },
+  tabActive: {
+    borderBottomColor: '#4CAF50',
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#666',
+  },
+  tabTextActive: {
+    color: '#4CAF50',
   },
   scrollView: {
     flex: 1,
@@ -479,6 +698,75 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 6,
     lineHeight: 20,
+  },
+  groceryItem: {
+    backgroundColor: '#fff',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  groceryItemChecked: {
+    backgroundColor: '#f0f9f0',
+    opacity: 0.8,
+  },
+  groceryCheckbox: {
+    marginRight: 15,
+    width: 30,
+    alignItems: 'center',
+  },
+  checkboxText: {
+    fontSize: 20,
+    color: '#4CAF50',
+    fontWeight: 'bold',
+  },
+  groceryItemContent: {
+    flex: 1,
+  },
+  groceryItemName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  groceryItemNameChecked: {
+    textDecorationLine: 'line-through',
+    color: '#999',
+  },
+  groceryItemQuantity: {
+    fontSize: 14,
+    color: '#666',
+  },
+  groceryItemQuantityChecked: {
+    textDecorationLine: 'line-through',
+    color: '#999',
+  },
+  groceryItemPrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  groceryItemPriceChecked: {
+    textDecorationLine: 'line-through',
+    color: '#999',
+  },
+  shareGroceryButton: {
+    backgroundColor: '#2196F3',
+    padding: 15,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginTop: 20,
+  },
+  shareGroceryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   actionsContainer: {
     flexDirection: 'row',
