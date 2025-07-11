@@ -26,9 +26,19 @@ export type RootStackParamList = {
   Preferences: undefined;
   Camera: undefined;
   FlyerResults: { flyerData: FlyerData[], imageUris: string[], preferences: UserPreferences };
-  MealPlan: { mealPlan: MealPlan };
+  MealPlan: { mealPlan: SerializableMealPlan };
   SavedPlans: undefined;
 };
+
+export interface SerializableMealPlan {
+  id: string;
+  meals: Meal[];
+  totalCost: number;
+  familySize: number;
+  preferences: UserPreferences;
+  groceryList?: GroceryList;
+  savedAt?: string; // Use string instead of Date for navigation
+}
 
 export interface MealPlan {
   id: string;
@@ -36,6 +46,31 @@ export interface MealPlan {
   totalCost: number;
   familySize: number;
   preferences: UserPreferences;
+  groceryList?: GroceryList;
+}
+
+export interface GroceryList {
+  items: GroceryItem[];
+  totalCost: number;
+  stores: StoreSection[];
+  checkedItems: string[]; // Array of item IDs that are checked off
+}
+
+export interface GroceryItem {
+  id: string;
+  name: string;
+  quantity: string;
+  price: number;
+  category: string;
+  store?: string;
+  unit?: string;
+  isChecked: boolean;
+}
+
+export interface StoreSection {
+  storeName: string;
+  items: GroceryItem[];
+  totalCost: number;
 }
 
 export interface Meal {
