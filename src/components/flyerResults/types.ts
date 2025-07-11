@@ -1,3 +1,4 @@
+import React from 'react';
 import { FlyerData, Product } from '../../../App';
 
 export interface ProductCardProps {
@@ -15,7 +16,7 @@ export interface FlyerSectionProps {
   flyer: FlyerData;
   index: number;
   onAddProduct: (flyerIndex: number) => void;
-  renderProduct: (product: Product, productIndex: number, flyerIndex: number) => JSX.Element;
+  renderProduct: (product: Product, productIndex: number, flyerIndex: number) => React.ReactNode;
 }
 
 export interface SummaryCardProps {
