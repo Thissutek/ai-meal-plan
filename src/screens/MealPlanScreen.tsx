@@ -42,11 +42,15 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [mealPlanTitle, setMealPlanTitle] = useState('');
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'meals' | 'grocery'>('meals');
-  const [groceryList, setGroceryList] = useState<GroceryItem[]>([]);
+  
+  // Weekly view state
   const [showWeeklyView, setShowWeeklyView] = useState(true);
   const [selectedDayMeals, setSelectedDayMeals] = useState<Meal[]>([]);
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
+  
+  // Grocery list state
+  const [activeTab, setActiveTab] = useState<'meals' | 'grocery'>('meals');
+  const [groceryList, setGroceryList] = useState<GroceryItem[]>([]);
 
   const toggleMealExpansion = (mealId: string) => {
     setExpandedMeal(expandedMeal === mealId ? null : mealId);
@@ -311,57 +315,6 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   };
 
-  const renderGroceryList = () => {
-    const items = groceryList.length > 0 ? groceryList : generateGroceryList();
-    const totalCost = items.reduce((sum, item) => sum + item.price, 0);
-    const checkedCount = items.filter(item => item.isChecked).length;
-
-    return (
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.content}>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>Grocery Shopping List</Text>
-            <Text style={styles.summarySubtitle}>
-              {checkedCount}/{items.length} items checked • {formatPrice(totalCost)}
-            </Text>
-          </View>
-
-          {items.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={[styles.groceryItem, item.isChecked && styles.groceryItemChecked]}
-              onPress={() => toggleGroceryItem(item.id)}
-            >
-              <View style={styles.groceryCheckbox}>
-                <Text style={styles.checkboxText}>
-                  {item.isChecked ? '✓' : '○'}
-                </Text>
-              </View>
-              <View style={styles.groceryItemContent}>
-                <Text style={[styles.groceryItemName, item.isChecked && styles.groceryItemNameChecked]}>
-                  {item.name}
-                </Text>
-                <Text style={[styles.groceryItemQuantity, item.isChecked && styles.groceryItemQuantityChecked]}>
-                  {item.quantity}
-                </Text>
-              </View>
-              <Text style={[styles.groceryItemPrice, item.isChecked && styles.groceryItemPriceChecked]}>
-                {formatPrice(item.price)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-
-          <TouchableOpacity
-            style={styles.shareGroceryButton}
-            onPress={() => shareGroceryList(items, totalCost)}
-          >
-            <Text style={styles.shareGroceryButtonText}>📤 Share Grocery List</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    );
-  };
-
   const renderDayMeals = () => {
     if (selectedDayMeals.length === 0) {
       return (
@@ -420,6 +373,57 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
           </View>
         )}
       </View>
+    );
+  };
+
+  const renderGroceryList = () => {
+    const items = groceryList.length > 0 ? groceryList : generateGroceryList();
+    const totalCost = items.reduce((sum, item) => sum + item.price, 0);
+    const checkedCount = items.filter(item => item.isChecked).length;
+
+    return (
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.content}>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryTitle}>Grocery Shopping List</Text>
+            <Text style={styles.summarySubtitle}>
+              {checkedCount}/{items.length} items checked • {formatPrice(totalCost)}
+            </Text>
+          </View>
+
+          {items.map((item) => (
+            <TouchableOpacity
+              key={item.id}
+              style={[styles.groceryItem, item.isChecked && styles.groceryItemChecked]}
+              onPress={() => toggleGroceryItem(item.id)}
+            >
+              <View style={styles.groceryCheckbox}>
+                <Text style={styles.checkboxText}>
+                  {item.isChecked ? '✓' : '○'}
+                </Text>
+              </View>
+              <View style={styles.groceryItemContent}>
+                <Text style={[styles.groceryItemName, item.isChecked && styles.groceryItemNameChecked]}>
+                  {item.name}
+                </Text>
+                <Text style={[styles.groceryItemQuantity, item.isChecked && styles.groceryItemQuantityChecked]}>
+                  {item.quantity}
+                </Text>
+              </View>
+              <Text style={[styles.groceryItemPrice, item.isChecked && styles.groceryItemPriceChecked]}>
+                {formatPrice(item.price)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+
+          <TouchableOpacity
+            style={styles.shareGroceryButton}
+            onPress={() => shareGroceryList(items, totalCost)}
+          >
+            <Text style={styles.shareGroceryButtonText}>📤 Share Grocery List</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
     );
   };
 
