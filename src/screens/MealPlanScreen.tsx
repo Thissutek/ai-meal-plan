@@ -10,11 +10,12 @@ import {
   Share,
   TextInput,
   Modal,
+  Switch,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList, MealPlan, Meal, SerializableMealPlan } from '../../App';
 import { saveMealPlan } from '../services/mealPlanStorage';
-
+import WeeklyMealPlanGrid from '../components/WeeklyMealPlanGrid';
 
 type Props = StackScreenProps<RootStackParamList, 'MealPlan'>;
 
@@ -23,6 +24,7 @@ interface GroceryItem {
   name: string;
   quantity: string;
   price: number;
+  category: string;
   isChecked: boolean;
 }
 
@@ -40,6 +42,13 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [mealPlanTitle, setMealPlanTitle] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Weekly view state
+  const [showWeeklyView, setShowWeeklyView] = useState(true);
+  const [selectedDayMeals, setSelectedDayMeals] = useState<Meal[]>([]);
+  const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
+  
+  // Grocery list state
   const [activeTab, setActiveTab] = useState<'meals' | 'grocery'>('meals');
   const [groceryList, setGroceryList] = useState<GroceryItem[]>([]);
 
@@ -138,6 +147,7 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
             name: ingredient.name,
             quantity: ingredient.quantity,
             price: ingredient.price,
+            category: 'other', // Add the required category property
             isChecked: false
           });
         }
@@ -174,7 +184,8 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
       const groceryListData = {
         items: items,
         totalCost: items.reduce((sum, item) => sum + item.price, 0),
-        checkedItems: []
+        checkedItems: [],
+        stores: [] // Add the required stores property to match the GroceryList interface
       };
 
       setMealPlan(prevPlan => ({
@@ -195,7 +206,8 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
     const groceryListData = {
       items: updatedList,
       totalCost: updatedList.reduce((sum, item) => sum + item.price, 0),
-      checkedItems: updatedList.filter(item => item.isChecked).map(item => item.id)
+      checkedItems: updatedList.filter(item => item.isChecked).map(item => item.id),
+      stores: [] // Add the required stores property to match the GroceryList interface
     };
 
     setMealPlan(prevPlan => ({
@@ -220,6 +232,17 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
       });
     } catch (error) {
       console.error('Error sharing grocery list:', error);
+    }
+  };
+
+  const handleDaySelected = (dayIndex: number, meals: Meal[]) => {
+    setSelectedDayIndex(dayIndex);
+    setSelectedDayMeals(meals);
+    // Automatically expand the first meal if available
+    if (meals.length > 0) {
+      setExpandedMeal(meals[0].id);
+    } else {
+      setExpandedMeal(null);
     }
   };
 
@@ -273,7 +296,6 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const renderMealCategory = (category: string, displayName: string, icon: string) => {
     const meals = getMealsByCategory(category);
-
     if (meals.length === 0) return null;
 
     const categoryTotal = meals.reduce((sum, meal) => sum + meal.cost, 0);
@@ -289,6 +311,67 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
           </Text>
         </View>
         {meals.map(renderMeal)}
+      </View>
+    );
+  };
+
+  const renderDayMeals = () => {
+    if (selectedDayMeals.length === 0) {
+      return (
+        <View style={styles.emptyDayContainer}>
+          <Text style={styles.emptyDayText}>No meals planned for this day</Text>
+        </View>
+      );
+    }
+
+    const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const dayName = daysOfWeek[selectedDayIndex];
+
+    // Group meals by category for the selected day
+    const mealsByCategory = {
+      breakfast: selectedDayMeals.filter(meal => meal.category === 'breakfast'),
+      lunch: selectedDayMeals.filter(meal => meal.category === 'lunch'),
+      dinner: selectedDayMeals.filter(meal => meal.category === 'dinner'),
+      snack: selectedDayMeals.filter(meal => meal.category === 'snack'),
+    };
+
+    // Calculate total cost for the day
+    const dayTotalCost = selectedDayMeals.reduce((sum, meal) => sum + meal.cost, 0);
+
+    return (
+      <View style={styles.dayMealsContainer}>
+        <View style={styles.dayHeader}>
+          <Text style={styles.dayTitle}>{dayName}'s Meals</Text>
+          <Text style={styles.dayTotalCost}>{formatPrice(dayTotalCost)}</Text>
+        </View>
+
+        {mealsByCategory.breakfast.length > 0 && (
+          <View style={styles.mealCategorySection}>
+            <Text style={styles.mealCategoryTitle}>🍳 Breakfast</Text>
+            {mealsByCategory.breakfast.map(renderMeal)}
+          </View>
+        )}
+
+        {mealsByCategory.lunch.length > 0 && (
+          <View style={styles.mealCategorySection}>
+            <Text style={styles.mealCategoryTitle}>🥪 Lunch</Text>
+            {mealsByCategory.lunch.map(renderMeal)}
+          </View>
+        )}
+
+        {mealsByCategory.dinner.length > 0 && (
+          <View style={styles.mealCategorySection}>
+            <Text style={styles.mealCategoryTitle}>🍽️ Dinner</Text>
+            {mealsByCategory.dinner.map(renderMeal)}
+          </View>
+        )}
+
+        {mealsByCategory.snack.length > 0 && (
+          <View style={styles.mealCategorySection}>
+            <Text style={styles.mealCategoryTitle}>🍌 Snacks</Text>
+            {mealsByCategory.snack.map(renderMeal)}
+          </View>
+        )}
       </View>
     );
   };
@@ -344,6 +427,74 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   };
 
+  const renderMealsContent = () => {
+    if (showWeeklyView) {
+      return (
+        <View style={styles.weeklyViewContainer}>
+          <WeeklyMealPlanGrid
+            mealPlan={mealPlan}
+            onDaySelected={handleDaySelected}
+          />
+          <ScrollView style={styles.selectedDayScrollView}>
+            {renderDayMeals()}
+          </ScrollView>
+        </View>
+      );
+    }
+
+    return (
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.content}>
+          {/* Header Summary */}
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryTitle}>Your Meal Plan</Text>
+            <Text style={styles.summarySubtitle}>
+              For {mealPlan.familySize} {mealPlan.familySize === 1 ? 'person' : 'people'}
+            </Text>
+
+            <View style={styles.costContainer}>
+              <Text style={styles.totalCostLabel}>Total Weekly Cost:</Text>
+              <Text style={styles.totalCost}>{formatPrice(mealPlan.totalCost)}</Text>
+            </View>
+
+            <View style={styles.averageContainer}>
+              <Text style={styles.averageText}>
+                Average per person: {formatPrice(mealPlan.totalCost / mealPlan.familySize)}
+              </Text>
+              <Text style={styles.averageText}>
+                Average per day: {formatPrice(mealPlan.totalCost / 7)}
+              </Text>
+            </View>
+          </View>
+
+          {/* Preferences Info */}
+          {(mealPlan.preferences.allergies.length > 0 ||
+            mealPlan.preferences.dietaryRestrictions.length > 0) && (
+              <View style={styles.preferencesCard}>
+                <Text style={styles.preferencesTitle}>Preferences Considered:</Text>
+                {mealPlan.preferences.allergies.length > 0 && (
+                  <Text style={styles.preferencesText}>
+                    🚫 Allergies avoided: {mealPlan.preferences.allergies.join(', ')}
+                  </Text>
+                )}
+                {mealPlan.preferences.dietaryRestrictions.length > 0 && (
+                  <Text style={styles.preferencesText}>
+                    🥗 Dietary: {mealPlan.preferences.dietaryRestrictions.join(', ')}
+                  </Text>
+                )}
+              </View>
+            )}
+
+          {/* Meal Categories */}
+          {renderMealCategory('breakfast', 'Breakfast', '🌅')}
+          {renderMealCategory('lunch', 'Lunch', '☀️')}
+          {renderMealCategory('dinner', 'Dinner', '🌙')}
+          {renderMealCategory('snack', 'Snacks', '🍎')}
+        </View>
+      </ScrollView>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Tab Navigation */}
@@ -367,60 +518,22 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Content */}
-      {activeTab === 'meals' ? (
-        <ScrollView style={styles.scrollView}>
-          <View style={styles.content}>
-            {/* Header Summary */}
-            <View style={styles.summaryCard}>
-              <Text style={styles.summaryTitle}>Your Meal Plan</Text>
-              <Text style={styles.summarySubtitle}>
-                For {mealPlan.familySize} {mealPlan.familySize === 1 ? 'person' : 'people'}
-              </Text>
-
-              <View style={styles.costContainer}>
-                <Text style={styles.totalCostLabel}>Total Weekly Cost:</Text>
-                <Text style={styles.totalCost}>{formatPrice(mealPlan.totalCost)}</Text>
-              </View>
-
-              <View style={styles.averageContainer}>
-                <Text style={styles.averageText}>
-                  Average per person: {formatPrice(mealPlan.totalCost / mealPlan.familySize)}
-                </Text>
-                <Text style={styles.averageText}>
-                  Average per day: {formatPrice(mealPlan.totalCost / 7)}
-                </Text>
-              </View>
-            </View>
-
-            {/* Preferences Info */}
-            {(mealPlan.preferences.allergies.length > 0 ||
-              mealPlan.preferences.dietaryRestrictions.length > 0) && (
-                <View style={styles.preferencesCard}>
-                  <Text style={styles.preferencesTitle}>Preferences Considered:</Text>
-                  {mealPlan.preferences.allergies.length > 0 && (
-                    <Text style={styles.preferencesText}>
-                      🚫 Allergies avoided: {mealPlan.preferences.allergies.join(', ')}
-                    </Text>
-                  )}
-                  {mealPlan.preferences.dietaryRestrictions.length > 0 && (
-                    <Text style={styles.preferencesText}>
-                      🥗 Dietary: {mealPlan.preferences.dietaryRestrictions.join(', ')}
-                    </Text>
-                  )}
-                </View>
-              )}
-
-            {/* Meal Categories */}
-            {renderMealCategory('breakfast', 'Breakfast', '🌅')}
-            {renderMealCategory('lunch', 'Lunch', '☀️')}
-            {renderMealCategory('dinner', 'Dinner', '🌙')}
-            {renderMealCategory('snack', 'Snacks', '🍎')}
-          </View>
-        </ScrollView>
-      ) : (
-        renderGroceryList()
+      {/* View Toggle for Meals Tab */}
+      {activeTab === 'meals' && (
+        <View style={styles.viewToggleContainer}>
+          <Text style={styles.viewToggleLabel}>Weekly View</Text>
+          <Switch
+            trackColor={{ false: '#767577', true: '#81b0ff' }}
+            thumbColor={showWeeklyView ? '#4CAF50' : '#f4f3f4'}
+            ios_backgroundColor="#3e3e3e"
+            onValueChange={() => setShowWeeklyView(!showWeeklyView)}
+            value={showWeeklyView}
+          />
+        </View>
       )}
+
+      {/* Content */}
+      {activeTab === 'meals' ? renderMealsContent() : renderGroceryList()}
 
       {/* Save Modal */}
       <Modal
@@ -520,6 +633,28 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: '#4CAF50',
+  },
+  viewToggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: '#f9f9f9',
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  viewToggleLabel: {
+    marginRight: 10,
+    fontSize: 16,
+    color: '#333',
+  },
+  weeklyViewContainer: {
+    flex: 1,
+  },
+  selectedDayScrollView: {
+    flex: 1,
+    backgroundColor: '#f9f9f9',
   },
   scrollView: {
     flex: 1,
@@ -698,6 +833,52 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 6,
     lineHeight: 20,
+  },
+  dayMealsContainer: {
+    padding: 15,
+  },
+  dayHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  dayTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+    textAlign: 'left',
+  },
+  dayTotalCost: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#4CAF50',
+  },
+  mealCategorySection: {
+    marginBottom: 20,
+  },
+  mealCategoryTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2E7D32',
+    marginBottom: 10,
+    paddingBottom: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  emptyDayContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyDayText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
   },
   groceryItem: {
     backgroundColor: '#fff',
