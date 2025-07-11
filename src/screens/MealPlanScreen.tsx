@@ -1,9 +1,12 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   StyleSheet,
   SafeAreaView,
   Alert,
   Share,
+  ActivityIndicator,
+  View,
+  Text,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList, MealPlan, Meal, SerializableMealPlan } from '../../App';
@@ -41,6 +44,11 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [mealPlanTitle, setMealPlanTitle] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  // Use refs to track mounted state for async operations
+  const isMounted = useRef(true);
   
   // Weekly view state
   const [showWeeklyView, setShowWeeklyView] = useState(true);
@@ -63,30 +71,74 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
     return mealPlan.meals.filter(meal => meal.category === category);
   };
 
+  // Validate meal plan data structure
+  const validateMealPlan = useCallback((plan: MealPlan): boolean => {
+    if (!plan) return false;
+    if (!Array.isArray(plan.meals)) return false;
+    if (typeof plan.totalCost !== 'number') return false;
+    if (typeof plan.familySize !== 'number') return false;
+    if (!plan.id) return false;
+    
+    // Check that each meal has required properties
+    for (const meal of plan.meals) {
+      if (!meal.id || !meal.name || !Array.isArray(meal.ingredients) || 
+          !Array.isArray(meal.instructions) || typeof meal.cost !== 'number' || 
+          !meal.category) {
+        return false;
+      }
+    }
+    
+    return true;
+  }, []);
+
   const handleSaveMealPlan = async () => {
+    // Validate inputs
     if (!mealPlanTitle.trim()) {
       Alert.alert('Missing Title', 'Please enter a title for your meal plan.');
       return;
     }
+    
+    if (!validateMealPlan(mealPlan)) {
+      Alert.alert('Invalid Data', 'The meal plan data appears to be corrupted or incomplete.');
+      return;
+    }
 
     setIsSaving(true);
+    setErrorMessage(null);
+    
     try {
       await saveMealPlan(mealPlan, mealPlanTitle.trim());
-      setShowSaveModal(false);
-      setMealPlanTitle('');
-      Alert.alert(
-        'Success!',
-        'Your meal plan has been saved successfully.',
-        [
-          { text: 'View Saved Plans', onPress: () => navigation.navigate('SavedPlans') },
-          { text: 'OK', style: 'default' }
-        ]
-      );
+      
+      if (isMounted.current) {
+        setShowSaveModal(false);
+        setMealPlanTitle('');
+        Alert.alert(
+          'Success!',
+          'Your meal plan has been saved successfully.',
+          [
+            { text: 'View Saved Plans', onPress: () => navigation.navigate('SavedPlans') },
+            { text: 'OK', style: 'default' }
+          ]
+        );
+      }
     } catch (error) {
-      Alert.alert('Error', 'Failed to save meal plan. Please try again.');
-      console.error('Save error:', error);
+      if (isMounted.current) {
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+        setErrorMessage(`Failed to save: ${errorMsg}`);
+        Alert.alert(
+          'Error Saving Plan', 
+          'Failed to save meal plan. Please try again.',
+          [
+            { text: 'Try Again', onPress: () => handleSaveMealPlan() },
+            { text: 'Cancel', style: 'cancel' }
+          ]
+        );
+        console.error('Save error:', error);
+      }
     } finally {
-      setIsSaving(false);
+      if (isMounted.current) {
+        setIsSaving(false);
+      }
     }
   };
 
@@ -97,6 +149,9 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
   };
 
   const shareMealPlan = async () => {
+    setIsLoading(true);
+    setErrorMessage(null);
+    
     try {
       const mealPlanText = generateShareText();
       await Share.share({
@@ -104,7 +159,16 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
         title: 'My AI Generated Meal Plan',
       });
     } catch (error) {
-      console.error('Error sharing meal plan:', error);
+      if (isMounted.current) {
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+        setErrorMessage(`Failed to share: ${errorMsg}`);
+        Alert.alert('Error Sharing', 'Could not share your meal plan. Please try again.');
+        console.error('Error sharing meal plan:', error);
+      }
+    } finally {
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -168,22 +232,76 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
     return Array.from(ingredients.values());
   }, [mealPlan.meals, generateStableId]);
 
-  const combineQuantities = (qty1: string, qty2: string): string => {
-    // Simple quantity combination - could be enhanced with unit parsing
-    const num1 = parseFloat(qty1);
-    const num2 = parseFloat(qty2);
-
-    if (!isNaN(num1) && !isNaN(num2)) {
-      const unit1 = qty1.replace(num1.toString(), '').trim();
-      const unit2 = qty2.replace(num2.toString(), '').trim();
-
-      if (unit1 === unit2) {
-        return `${(num1 + num2)} ${unit1}`;
+  const combineQuantities = useCallback((qty1: string, qty2: string): string => {
+    // Enhanced quantity combination with better unit handling
+    const parseQuantity = (qtyStr: string): { value: number, unit: string } => {
+      // Common unit conversions for cooking
+      const unitMap: Record<string, { base: string, factor: number }> = {
+        'tbsp': { base: 'tbsp', factor: 1 },
+        'tablespoon': { base: 'tbsp', factor: 1 },
+        'tablespoons': { base: 'tbsp', factor: 1 },
+        'tsp': { base: 'tsp', factor: 1 },
+        'teaspoon': { base: 'tsp', factor: 1 },
+        'teaspoons': { base: 'tsp', factor: 1 },
+        'cup': { base: 'cup', factor: 1 },
+        'cups': { base: 'cup', factor: 1 },
+        'oz': { base: 'oz', factor: 1 },
+        'ounce': { base: 'oz', factor: 1 },
+        'ounces': { base: 'oz', factor: 1 },
+        'lb': { base: 'lb', factor: 1 },
+        'pound': { base: 'lb', factor: 1 },
+        'pounds': { base: 'lb', factor: 1 },
+        'g': { base: 'g', factor: 1 },
+        'gram': { base: 'g', factor: 1 },
+        'grams': { base: 'g', factor: 1 },
+        'kg': { base: 'g', factor: 1000 },
+        'kilogram': { base: 'g', factor: 1000 },
+        'kilograms': { base: 'g', factor: 1000 },
+        'ml': { base: 'ml', factor: 1 },
+        'milliliter': { base: 'ml', factor: 1 },
+        'milliliters': { base: 'ml', factor: 1 },
+        'l': { base: 'ml', factor: 1000 },
+        'liter': { base: 'ml', factor: 1000 },
+        'liters': { base: 'ml', factor: 1000 }
+      };
+      
+      // Extract number and unit
+      const numMatch = qtyStr.match(/^([\d./]+)/);
+      if (!numMatch) return { value: 1, unit: qtyStr.trim() };
+      
+      const value = eval(numMatch[0]); // Safely evaluate fractions like 1/2
+      const unitStr = qtyStr.replace(numMatch[0], '').trim().toLowerCase();
+      
+      // Find matching unit in map
+      for (const [unitKey, unitData] of Object.entries(unitMap)) {
+        if (unitStr.includes(unitKey)) {
+          return { 
+            value: value * unitData.factor, 
+            unit: unitData.base 
+          };
+        }
       }
+      
+      return { value: value, unit: unitStr };
+    };
+    
+    try {
+      const quantity1 = parseQuantity(qty1);
+      const quantity2 = parseQuantity(qty2);
+      
+      // If units match or can be converted, combine them
+      if (quantity1.unit === quantity2.unit) {
+        const totalValue = quantity1.value + quantity2.value;
+        return `${totalValue % 1 === 0 ? totalValue : totalValue.toFixed(2)} ${quantity1.unit}`;
+      }
+      
+      // Units don't match, return both quantities
+      return `${qty1}, ${qty2}`;
+    } catch (error) {
+      console.error('Error combining quantities:', error);
+      return `${qty1}, ${qty2}`;
     }
-
-    return `${qty1}, ${qty2}`;
-  };
+  }, []);
 
   // Create a memoized grocery list
   const memoizedGroceryList = useMemo(() => {
@@ -206,18 +324,43 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
   // Generate grocery list when switching to grocery tab
   useEffect(() => {
     if (activeTab === 'grocery' && groceryList.length === 0) {
-      const items = generateGroceryList();
-      setGroceryList(items);
-
-      // Update meal plan with grocery list data
-      const groceryListData = createGroceryListData(items);
-
-      setMealPlan(prevPlan => ({
-        ...prevPlan,
-        groceryList: groceryListData
-      }));
+      setIsLoading(true);
+      setErrorMessage(null);
+      
+      try {
+        const items = generateGroceryList();
+        
+        if (isMounted.current) {
+          setGroceryList(items);
+          
+          // Update meal plan with grocery list data
+          const groceryListData = createGroceryListData(items);
+          
+          setMealPlan(prevPlan => ({
+            ...prevPlan,
+            groceryList: groceryListData
+          }));
+        }
+      } catch (error) {
+        if (isMounted.current) {
+          const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+          setErrorMessage(`Failed to generate grocery list: ${errorMsg}`);
+          console.error('Error generating grocery list:', error);
+        }
+      } finally {
+        if (isMounted.current) {
+          setIsLoading(false);
+        }
+      }
     }
   }, [activeTab, groceryList.length, generateGroceryList, createGroceryListData]);
+  
+  // Cleanup effect to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   const toggleGroceryItem = useCallback((itemId: string) => {
     const updatedList = groceryList.map(item =>
@@ -235,24 +378,54 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
     }));
   }, [groceryList, createGroceryListData]);
 
-  const shareGroceryList = async (items: GroceryItem[], totalCost: number) => {
-    let text = `🛒 Grocery Shopping List\n`;
-    text += `Total Cost: ${formatPrice(totalCost)}\n\n`;
-
-    items.forEach(item => {
-      const status = item.isChecked ? '✓' : '○';
-      text += `${status} ${item.quantity} ${item.name} - ${formatPrice(item.price)}\n`;
-    });
-
+  const shareGroceryList = useCallback(async (items: GroceryItem[], totalCost: number) => {
+    if (!items || items.length === 0) {
+      Alert.alert('Empty List', 'There are no items in your grocery list to share.');
+      return;
+    }
+    
+    setIsLoading(true);
+    setErrorMessage(null);
+    
     try {
+      // Group items by category for better organization
+      const categorizedItems = items.reduce<Record<string, GroceryItem[]>>((acc, item) => {
+        const category = item.category || 'other';
+        if (!acc[category]) acc[category] = [];
+        acc[category].push(item);
+        return acc;
+      }, {});
+      
+      let text = `🛒 Grocery Shopping List\n`;
+      text += `Total Cost: ${formatPrice(totalCost)}\n\n`;
+
+      // Add items by category
+      Object.entries(categorizedItems).forEach(([category, categoryItems]) => {
+        text += `${category.toUpperCase()}:\n`;
+        categoryItems.forEach(item => {
+          const status = item.isChecked ? '✓' : '○';
+          text += `${status} ${item.quantity} ${item.name} - ${formatPrice(item.price)}\n`;
+        });
+        text += '\n';
+      });
+
       await Share.share({
         message: text,
         title: 'Grocery Shopping List',
       });
     } catch (error) {
-      console.error('Error sharing grocery list:', error);
+      if (isMounted.current) {
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+        setErrorMessage(`Failed to share: ${errorMsg}`);
+        Alert.alert('Error Sharing', 'Could not share your grocery list. Please try again.');
+        console.error('Error sharing grocery list:', error);
+      }
+    } finally {
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
     }
-  };
+  }, [formatPrice]);
 
   const handleDaySelected = (dayIndex: number, meals: Meal[]) => {
     setSelectedDayIndex(dayIndex);
@@ -265,8 +438,33 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
     }
   };
   
+  // Error display component
+  const ErrorDisplay = useCallback(() => {
+    if (!errorMessage) return null;
+    
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{errorMessage}</Text>
+      </View>
+    );
+  }, [errorMessage]);
+  
+  // Loading overlay component
+  const LoadingOverlay = useCallback(() => {
+    if (!isLoading) return null;
+    
+    return (
+      <View style={styles.loadingOverlay}>
+        <ActivityIndicator size="large" color="#2E7D32" />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }, [isLoading]);
+  
   return (
       <SafeAreaView style={styles.container}>
+        <ErrorDisplay />
+        <LoadingOverlay />
         {/* Tab Navigation */}
         <TabNavigation 
           activeTab={activeTab}
@@ -335,6 +533,34 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f9f9f9',
+  },
+  errorContainer: {
+    backgroundColor: '#ffebee',
+    padding: 10,
+    margin: 10,
+    borderRadius: 5,
+    borderLeftWidth: 4,
+    borderLeftColor: '#d32f2f',
+  },
+  errorText: {
+    color: '#d32f2f',
+    fontSize: 14,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+    zIndex: 1000,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#2E7D32',
   }
 });
 
