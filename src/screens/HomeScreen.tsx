@@ -12,11 +12,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getMealPlanCount } from '../services/mealPlanStorage';
 
 // Import components
-import Header from '../components/Header';
-import SavedPlansButton from '../components/SavedPlansButton';
-import PreferencesCard from '../components/PreferencesCard';
-import InstructionsCard from '../components/InstructionsCard';
-import ActionButton from '../components/ActionButton';
+import Header from '../components/shared/Header';
+import ActionButton from '../components/shared/ActionButton';
+import SavedPlansButton from '../components/home/SavedPlansButton';
+import PreferencesCard from '../components/home/PreferencesCard';
+import InstructionsCard from '../components/home/InstructionsCard';
 
 type Props = StackScreenProps<RootStackParamList, 'Home'>;
 

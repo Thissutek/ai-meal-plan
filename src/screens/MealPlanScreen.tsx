@@ -11,13 +11,13 @@ import {
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList, MealPlan, Meal, SerializableMealPlan } from '../../App';
 import { saveMealPlan } from '../services/mealPlanStorage';
-import TabNavigation from '../components/TabNavigation';
-import ViewToggle from '../components/ViewToggle';
-import WeeklyView from '../components/WeeklyView';
-import ListMealsView from '../components/ListMealsView';
-import GroceryListView from '../components/GroceryListView';
-import SavePlanModal from '../components/SavePlanModal';
-import ActionButtons from '../components/ActionButtons';
+import TabNavigation from '../components/mealplan/TabNavigation';
+import ViewToggle from '../components/mealplan/ViewToggle';
+import WeeklyView from '../components/mealplan/WeeklyView';
+import ListMealsView from '../components/mealplan/ListMealsView';
+import GroceryListView from '../components/mealplan/GroceryListView';
+import SavePlanModal from '../components/mealplan/SavePlanModal';
+import ActionButtons from '../components/mealplan/ActionButtons';
 
 type Props = StackScreenProps<RootStackParamList, 'MealPlan'>;
 

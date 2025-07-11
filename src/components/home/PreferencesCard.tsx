@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { UserPreferences } from '../../App';
+import { UserPreferences } from '../../../App';
 
 interface PreferencesCardProps {
   preferences: UserPreferences;
