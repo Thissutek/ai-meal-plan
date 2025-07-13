@@ -197,14 +197,6 @@ npx eas submit --platform android
 - **React Hook Form**: Form handling and validation
 - **React Native Elements**: UI component library
 
-## 📝 License
-
-This project is created for educational and personal use. Please respect the terms of service for all integrated APIs.
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
 ## 📞 Support
 
 For issues with:
