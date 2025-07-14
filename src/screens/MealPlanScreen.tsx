@@ -81,9 +81,16 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
     
     // Check that each meal has required properties
     for (const meal of plan.meals) {
+      // Check required fields
       if (!meal.id || !meal.name || !Array.isArray(meal.ingredients) || 
-          !Array.isArray(meal.instructions) || typeof meal.cost !== 'number' || 
-          !meal.category) {
+          typeof meal.cost !== 'number' || !meal.category) {
+        console.error('Invalid meal structure:', meal);
+        return false;
+      }
+      
+      // If instructions exist, they should be an array
+      if (meal.instructions && !Array.isArray(meal.instructions)) {
+        console.error('Invalid instructions format:', meal.instructions);
         return false;
       }
     }
