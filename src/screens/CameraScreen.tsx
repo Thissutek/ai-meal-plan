@@ -1,14 +1,11 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   SafeAreaView,
-  Image,
   Alert,
   ScrollView,
-  ActivityIndicator,
   BackHandler,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
@@ -18,19 +15,26 @@ import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { extractFlyerData } from '../services/openaiService';
 import ProcessingModal from '../components/ProcessingModal';
+import {
+  Header,
+  ActionButtons,
+  CapturedImagesGallery,
+  TipsSection,
+  CameraViewComponent,
+  PermissionRequest,
+  BottomAction,
+  CapturedImage
+} from '../components/camera';
 
 type Props = StackScreenProps<RootStackParamList, 'Camera'>;
 
-interface CapturedImage {
-  uri: string;
-  id: string;
-}
+// CapturedImage interface is now imported from '../components/camera'
 
 const CameraScreen: React.FC<Props> = ({ navigation }) => {
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<CameraType>('back');
   const [capturedImages, setCapturedImages] = useState<CapturedImage[]>([]);
-  const [cameraRef, setCameraRef] = useState<CameraView | null>(null);
+  const cameraRef = useRef<CameraView | null>(null);
   const [showCamera, setShowCamera] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [processingMessage, setProcessingMessage] = useState('Processing your flyers...');
@@ -81,9 +85,9 @@ const CameraScreen: React.FC<Props> = ({ navigation }) => {
   }, [navigation, isProcessing]);
 
   const takePicture = async () => {
-    if (cameraRef) {
+    if (cameraRef.current) {
       try {
-        const photo = await cameraRef.takePictureAsync({
+        const photo = await cameraRef.current.takePictureAsync({
           quality: 0.8,
           base64: false,
         });
@@ -186,59 +190,20 @@ const CameraScreen: React.FC<Props> = ({ navigation }) => {
   }
 
   if (!permission.granted) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.noPermissionText}>
-          Camera access is required to scan flyer images.
-        </Text>
-        <TouchableOpacity
-          style={styles.button}
-          onPress={requestPermission}
-        >
-          <Text style={styles.buttonText}>Grant Permission</Text>
-        </TouchableOpacity>
-      </View>
-    );
+    return <PermissionRequest onRequestPermission={requestPermission} />;
   }
 
   if (showCamera) {
     return (
-      <SafeAreaView style={styles.container}>
-        {/* Processing Modal */}
-        <ProcessingModal visible={isProcessing} message={processingMessage} />
-        
-        <CameraView
-          style={styles.camera}
-          facing={facing}
-          ref={(ref) => setCameraRef(ref)}
-        />
-
-        {/* Camera controls positioned absolutely on top */}
-        <View style={styles.cameraButtonContainer}>
-          <TouchableOpacity
-            style={styles.cameraButton}
-            onPress={() => setShowCamera(false)}
-          >
-            <Text style={styles.cameraButtonText}>Cancel</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.captureButton}
-            onPress={takePicture}
-          >
-            <View style={styles.captureButtonInner} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.cameraButton}
-            onPress={() => {
-              setFacing(current => (current === 'back' ? 'front' : 'back'));
-            }}
-          >
-            <Text style={styles.cameraButtonText}>Flip</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+      <CameraViewComponent
+        cameraRef={cameraRef}
+        facing={facing}
+        setFacing={setFacing}
+        onCapture={takePicture}
+        onCancel={() => setShowCamera(false)}
+        isProcessing={isProcessing}
+        processingMessage={processingMessage}
+      />
     );
   }
 
@@ -249,90 +214,37 @@ const CameraScreen: React.FC<Props> = ({ navigation }) => {
       
       <ScrollView style={styles.scrollView}>
         <View style={styles.content}>
-          <View style={styles.header}>
-            <Text style={styles.title}>Scan Grocery Flyers</Text>
-            <Text style={styles.subtitle}>
-              Take photos of up to 3 grocery flyers to get the best meal plan recommendations
-            </Text>
-          </View>
+          <Header 
+            title="Scan Grocery Flyers" 
+            subtitle="Take photos of up to 3 grocery flyers to get the best meal plan recommendations" 
+          />
 
-          <View style={styles.buttonRow}>
-            <TouchableOpacity
-              style={[styles.actionButton, styles.cameraActionButton]}
-              onPress={() => setShowCamera(true)}
-            >
-              <Text style={styles.actionButtonText}>📷 Take Photo</Text>
-            </TouchableOpacity>
+          <ActionButtons 
+            onOpenCamera={() => setShowCamera(true)} 
+            onPickImage={pickImage} 
+          />
 
-            <TouchableOpacity
-              style={[styles.actionButton, styles.galleryActionButton]}
-              onPress={pickImage}
-            >
-              <Text style={styles.actionButtonText}>🖼️ Choose from Gallery</Text>
-            </TouchableOpacity>
-          </View>
+          <CapturedImagesGallery 
+            capturedImages={capturedImages} 
+            onRemoveImage={removeImage} 
+          />
 
-          {capturedImages.length > 0 && (
-            <View style={styles.imagesSection}>
-              <Text style={styles.imagesSectionTitle}>
-                Captured Images ({capturedImages.length}/3)
-              </Text>
-
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={styles.imagesContainer}>
-                  {capturedImages.map((image) => (
-                    <View key={image.id} style={styles.imageContainer}>
-                      <Image source={{ uri: image.uri }} style={styles.image} />
-                      <TouchableOpacity
-                        style={styles.removeButton}
-                        onPress={() => removeImage(image.id)}
-                      >
-                        <Text style={styles.removeButtonText}>×</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                </View>
-              </ScrollView>
-            </View>
-          )}
-
-          <View style={styles.tips}>
-            <Text style={styles.tipsTitle}>📝 Tips for better results:</Text>
-            <Text style={styles.tipText}>• Ensure good lighting and clear text</Text>
-            <Text style={styles.tipText}>• Capture the entire flyer page</Text>
-            <Text style={styles.tipText}>• Avoid shadows and reflections</Text>
-            <Text style={styles.tipText}>• Include price information clearly</Text>
-          </View>
+          <TipsSection 
+            tips={[
+              '• Ensure good lighting and clear text',
+              '• Capture the entire flyer page',
+              '• Avoid shadows and reflections',
+              '• Include price information clearly'
+            ]} 
+          />
         </View>
       </ScrollView>
 
-      <View style={styles.bottomContainer}>
-        {capturedImages.length >= 3 && (
-          <Text style={styles.limitText}>
-            Maximum of 3 images reached
-          </Text>
-        )}
-
-        <TouchableOpacity
-          style={[
-            styles.processButton,
-            (capturedImages.length === 0 || isProcessing) && styles.processButtonDisabled
-          ]}
-          onPress={processImages}
-          disabled={capturedImages.length === 0 || isProcessing}
-        >
-          {isProcessing ? (
-            <View style={styles.processingContainer}>
-              <ActivityIndicator color="#fff" size="small" />
-              <Text style={styles.processButtonText}>Processing...</Text>
-            </View>
-          ) : (
-            <Text style={styles.processButtonText}>
-              Analyze Flyers ({capturedImages.length} image{capturedImages.length !== 1 ? 's' : ''})
-            </Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      <BottomAction 
+        capturedImages={capturedImages} 
+        isProcessing={isProcessing} 
+        onProcess={processImages} 
+      />
     </SafeAreaView>
   );
 };
@@ -347,192 +259,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-  },
-  header: {
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2E7D32',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    marginBottom: 20,
-    gap: 10,
-  },
-  actionButton: {
-    flex: 1,
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  cameraActionButton: {
-    backgroundColor: '#4CAF50',
-  },
-  galleryActionButton: {
-    backgroundColor: '#2196F3',
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  imagesSection: {
-    marginBottom: 20,
-  },
-  imagesSectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2E7D32',
-    marginBottom: 10,
-  },
-  imagesContainer: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  imageContainer: {
-    position: 'relative',
-  },
-  image: {
-    width: 120,
-    height: 160,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#4CAF50',
-  },
-  removeButton: {
-    position: 'absolute',
-    top: -5,
-    right: -5,
-    backgroundColor: '#f44336',
-    borderRadius: 15,
-    width: 30,
-    height: 30,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  tips: {
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
-  },
-  tipsTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#2E7D32',
-    marginBottom: 10,
-  },
-  tipText: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 5,
-    paddingLeft: 5,
-  },
-  bottomContainer: {
-    padding: 20,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  limitText: {
-    textAlign: 'center',
-    color: '#ff9800',
-    fontSize: 14,
-    marginBottom: 10,
-    fontWeight: 'bold',
-  },
-  processButton: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  processButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  processButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  processingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  camera: {
-    flex: 1,
-  },
-  cameraButtonContainer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'transparent',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    paddingHorizontal: 20,
-    paddingBottom: 50,
-  },
-  cameraButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    padding: 15,
-    borderRadius: 10,
-  },
-  cameraButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  captureButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  captureButtonInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#fff',
-  },
-  noPermissionText: {
-    fontSize: 18,
-    textAlign: 'center',
-    color: '#666',
-    marginBottom: 20,
-  },
-  button: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginHorizontal: 20,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+  }
 });
 
 export default CameraScreen;

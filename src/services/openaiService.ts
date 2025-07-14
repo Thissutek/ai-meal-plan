@@ -2,7 +2,7 @@ import { UserPreferences, MealPlan, Meal, Ingredient } from "../../App";
 
 // You'll need to set your OpenAI API key
 const OPENAI_API_KEY =
-  process.env.EXPO_PUBLIC_OPENAI_API_KEY || "your-api-key-here";
+  process.env.EXPO_PUBLIC_OPENAI_API_KEY;
 
 export interface FlyerData {
   storeName: string;
@@ -27,7 +27,7 @@ export const processFlyers = async (
   );
 
   // Check if API key is available
-  if (!OPENAI_API_KEY || OPENAI_API_KEY === "your-api-key-here") {
+  if (!OPENAI_API_KEY) {
     console.log("No valid API key found, using mock data");
     return createMockMealPlan(preferences);
   }

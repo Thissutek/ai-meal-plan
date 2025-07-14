@@ -1,17 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  TextInput,
   Alert,
+  ScrollView,
   SafeAreaView,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList, UserPreferences } from '../../App';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  SectionHeader,
+  FamilySizeSelector,
+  AllergyTags,
+  CustomAllergyInput,
+  SelectedAllergies,
+  SaveButton
+} from '../components/preferences';
 
 type Props = StackScreenProps<RootStackParamList, 'Preferences'>;
 
@@ -99,96 +104,45 @@ const PreferencesScreen: React.FC<Props> = ({ navigation }) => {
 
           {/* Family Size */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Family Size</Text>
-            <Text style={styles.sectionSubtitle}>How many people will you be cooking for?</Text>
-            <View style={styles.familySizeContainer}>
-              {FAMILY_SIZES.map((size) => (
-                <TouchableOpacity
-                  key={size}
-                  style={[
-                    styles.familySizeButton,
-                    familySize === size && styles.familySizeButtonSelected
-                  ]}
-                  onPress={() => setFamilySize(size)}
-                >
-                  <Text style={[
-                    styles.familySizeButtonText,
-                    familySize === size && styles.familySizeButtonTextSelected
-                  ]}>
-                    {size}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <SectionHeader 
+              title="Family Size" 
+              subtitle="How many people will you be cooking for?" 
+            />
+            <FamilySizeSelector 
+              familySize={familySize} 
+              familySizes={FAMILY_SIZES} 
+              onSelectFamilySize={setFamilySize} 
+            />
           </View>
+
           {/* Allergies */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Allergies</Text>
-            <Text style={styles.sectionSubtitle}>Select any allergies to avoid</Text>
+            <SectionHeader 
+              title="Allergies" 
+              subtitle="Select any allergies to avoid" 
+            />
+            
+            <AllergyTags 
+              commonAllergies={COMMON_ALLERGIES} 
+              selectedAllergies={selectedAllergies} 
+              onToggleAllergy={toggleAllergy} 
+            />
 
-            <View style={styles.tagContainer}>
-              {COMMON_ALLERGIES.map((allergy) => (
-                <TouchableOpacity
-                  key={allergy}
-                  style={[
-                    styles.tag,
-                    selectedAllergies.includes(allergy) && styles.tagSelected
-                  ]}
-                  onPress={() => toggleAllergy(allergy)}
-                >
-                  <Text style={[
-                    styles.tagText,
-                    selectedAllergies.includes(allergy) && styles.tagTextSelected
-                  ]}>
-                    {allergy}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <CustomAllergyInput 
+              customAllergy={customAllergy} 
+              onChangeCustomAllergy={setCustomAllergy} 
+              onAddCustomAllergy={addCustomAllergy} 
+            />
 
-            <View style={styles.customInputContainer}>
-              <TextInput
-                style={[styles.textInput, styles.customInput]}
-                placeholder="Add custom allergy"
-                value={customAllergy}
-                onChangeText={setCustomAllergy}
-              />
-              <TouchableOpacity
-                style={styles.addButton}
-                onPress={addCustomAllergy}
-              >
-                <Text style={styles.addButtonText}>Add</Text>
-              </TouchableOpacity>
-            </View>
-
-            {selectedAllergies.length > 0 && (
-              <View style={styles.selectedContainer}>
-                <Text style={styles.selectedTitle}>Selected Allergies:</Text>
-                <View style={styles.selectedTagContainer}>
-                  {selectedAllergies.map((allergy) => (
-                    <TouchableOpacity
-                      key={allergy}
-                      style={styles.selectedTag}
-                      onPress={() => removeAllergy(allergy)}
-                    >
-                      <Text style={styles.selectedTagText}>{allergy} ×</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            )}
+            <SelectedAllergies 
+              selectedAllergies={selectedAllergies} 
+              onRemoveAllergy={removeAllergy} 
+            />
           </View>
         </View>
       </ScrollView>
 
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={styles.saveButton}
-          onPress={savePreferences}
-        >
-          <Text style={styles.saveButtonText}>Save Preferences</Text>
-        </TouchableOpacity>
-      </View>
+      <SaveButton onSave={savePreferences} />
     </SafeAreaView>
   );
 };
@@ -206,136 +160,6 @@ const styles = StyleSheet.create({
   },
   section: {
     marginBottom: 30,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2E7D32',
-    marginBottom: 5,
-  },
-  sectionSubtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 15,
-  },
-  familySizeContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  familySizeButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    borderWidth: 2,
-    borderColor: '#4CAF50',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  familySizeButtonSelected: {
-    backgroundColor: '#4CAF50',
-  },
-  familySizeButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  familySizeButtonTextSelected: {
-    color: '#fff',
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#fff',
-  },
-  tagContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 10,
-  },
-  tag: {
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#4CAF50',
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    margin: 5,
-  },
-  tagSelected: {
-    backgroundColor: '#4CAF50',
-  },
-  tagText: {
-    color: '#4CAF50',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  tagTextSelected: {
-    color: '#fff',
-  },
-  customInputContainer: {
-    flexDirection: 'row',
-    marginBottom: 15,
-  },
-  customInput: {
-    flex: 1,
-    marginRight: 10,
-  },
-  addButton: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    justifyContent: 'center',
-  },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  selectedContainer: {
-    marginTop: 15,
-  },
-  selectedTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
-  },
-  selectedTagContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  selectedTag: {
-    backgroundColor: '#E8F5E8',
-    borderRadius: 15,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    margin: 3,
-  },
-  selectedTagText: {
-    color: '#2E7D32',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  buttonContainer: {
-    padding: 20,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  saveButton: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
   },
 });
 
