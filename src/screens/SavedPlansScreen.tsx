@@ -77,7 +77,7 @@ const SavedPlansScreen: React.FC<Props> = ({ navigation }) => {
       ...plan,
       savedAt: plan.savedAt.toISOString()
     };
-    navigation.navigate('MealPlan', { mealPlan: serializedPlan });
+    navigation.navigate('MealPlan', { mealPlan: serializedPlan, source: 'saved' });
   };
 
   const formatDate = (date: Date): string => {

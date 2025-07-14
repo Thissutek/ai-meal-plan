@@ -31,7 +31,7 @@ interface GroceryItem {
 }
 
 const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { mealPlan: serializedMealPlan } = route.params;
+  const { mealPlan: serializedMealPlan, source = 'camera' } = route.params;
 
   // Convert serialized meal plan back to proper MealPlan with Date objects
   const initialMealPlan: MealPlan = {
@@ -572,11 +572,14 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
           isSaving={isSaving}
         />
     
-        {/* Bottom Actions */}
+        {/* Bottom Actions - Share is always visible, Save and New Plan only in camera flow */}
         <ActionButtons
           onSave={openSaveModal}
           onShare={shareMealPlan}
           onNewPlan={() => navigation.navigate('Camera')}
+          showSaveButton={source === 'camera'}
+          showShareButton={true}
+          showNewPlanButton={source === 'camera'}
         />
       </SafeAreaView>
     );
