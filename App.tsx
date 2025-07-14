@@ -28,7 +28,7 @@ export type RootStackParamList = {
   Preferences: undefined;
   Camera: undefined;
   FlyerResults: { flyerData: FlyerData[], imageUris: string[], preferences: UserPreferences };
-  MealPlan: { mealPlan: SerializableMealPlan };
+  MealPlan: { mealPlan: SerializableMealPlan, source?: 'home' | 'camera' | 'saved' };
   SavedPlans: undefined;
 };
 

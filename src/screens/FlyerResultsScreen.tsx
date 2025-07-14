@@ -184,7 +184,7 @@ const FlyerResultsScreen: React.FC<Props> = ({ route, navigation }) => {
     try {
       const mealPlan = await generateMealPlanFromProducts(allProducts, preferences);
       const serializedMealPlan = serializeMealPlanForNavigation(mealPlan);
-      navigation.navigate('MealPlan', { mealPlan: serializedMealPlan });
+      navigation.navigate('MealPlan', { mealPlan: serializedMealPlan, source: 'camera' });
     } catch (error) {
       console.error('Error generating meal plan:', error);
       Alert.alert(
