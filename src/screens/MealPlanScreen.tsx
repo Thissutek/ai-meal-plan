@@ -328,31 +328,51 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
     };
   }, []);
 
-  // Generate grocery list when switching to grocery tab
+  // Initialize or load grocery list when switching to grocery tab
   useEffect(() => {
     if (activeTab === 'grocery' && groceryList.length === 0) {
       setIsLoading(true);
       setErrorMessage(null);
       
       try {
-        const items = generateGroceryList();
-        
-        if (isMounted.current) {
-          setGroceryList(items);
-          
-          // Update meal plan with grocery list data
-          const groceryListData = createGroceryListData(items);
-          
-          setMealPlan(prevPlan => ({
-            ...prevPlan,
-            groceryList: groceryListData
+        // First check if there's a saved grocery list in the meal plan
+        if (mealPlan.groceryList && Array.isArray(mealPlan.groceryList.items) && mealPlan.groceryList.items.length > 0) {
+          // Use the saved grocery list from the database
+          console.log('Loading saved grocery list from database');
+          const savedItems = mealPlan.groceryList.items.map(item => ({
+            id: item.id,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price || 0,
+            category: item.category || 'other',
+            isChecked: item.isChecked || mealPlan.groceryList?.checkedItems?.includes(item.id) || false
           }));
+          
+          if (isMounted.current) {
+            setGroceryList(savedItems);
+          }
+        } else {
+          // Generate a new grocery list if none exists
+          console.log('Generating new grocery list');
+          const items = generateGroceryList();
+          
+          if (isMounted.current) {
+            setGroceryList(items);
+            
+            // Update meal plan with grocery list data
+            const groceryListData = createGroceryListData(items);
+            
+            setMealPlan(prevPlan => ({
+              ...prevPlan,
+              groceryList: groceryListData
+            }));
+          }
         }
       } catch (error) {
         if (isMounted.current) {
           const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
-          setErrorMessage(`Failed to generate grocery list: ${errorMsg}`);
-          console.error('Error generating grocery list:', error);
+          setErrorMessage(`Failed to load grocery list: ${errorMsg}`);
+          console.error('Error loading grocery list:', error);
         }
       } finally {
         if (isMounted.current) {
@@ -360,7 +380,7 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
         }
       }
     }
-  }, [activeTab, groceryList.length, generateGroceryList, createGroceryListData]);
+  }, [activeTab, groceryList.length, generateGroceryList, createGroceryListData, mealPlan.groceryList]);
   
   // Cleanup effect to prevent memory leaks
   useEffect(() => {
@@ -379,10 +399,30 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
     // Update meal plan with new grocery list state
     const groceryListData = createGroceryListData(updatedList);
 
-    setMealPlan(prevPlan => ({
-      ...prevPlan,
+    const updatedMealPlan = {
+      ...mealPlan,
       groceryList: groceryListData
-    }));
+    };
+    
+    setMealPlan(updatedMealPlan);
+    
+    // Save the updated meal plan to the database to persist the checked state
+    // Check if this meal plan has already been saved to the database
+    const savedPlan = initialMealPlan as unknown as { cloudId?: string, title?: string };
+    
+    if (savedPlan.cloudId) {
+      // If this is a saved meal plan, update it in the database
+      const planTitle = savedPlan.title || `Meal Plan ${new Date().toLocaleDateString()}`;
+      
+      // Save the updated meal plan to persist the grocery list state
+      saveMealPlan(updatedMealPlan, planTitle)
+        .then(() => {
+          console.log('Grocery list checked state saved successfully');
+        })
+        .catch(error => {
+          console.error('Failed to save grocery list checked state:', error);
+        });
+    }
   }, [groceryList, createGroceryListData]);
 
   const shareGroceryList = useCallback(async (items: GroceryItem[], totalCost: number) => {
