@@ -87,7 +87,7 @@ const PreferencesScreen: React.FC<Props> = ({ navigation }) => {
         [
           {
             text: 'OK',
-            onPress: () => navigation.navigate('Home')
+            onPress: () => navigation.replace('Home')
           }
         ]
       );
