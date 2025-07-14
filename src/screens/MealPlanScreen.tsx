@@ -399,25 +399,31 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
     // Update meal plan with new grocery list state
     const groceryListData = createGroceryListData(updatedList);
 
+    // Get the cloudId from the initial meal plan if it exists
+    const savedPlan = initialMealPlan as unknown as { cloudId?: string, title?: string };
+    const cloudId = savedPlan.cloudId;
+    
     const updatedMealPlan = {
       ...mealPlan,
-      groceryList: groceryListData
+      groceryList: groceryListData,
+      // Ensure cloudId is preserved in the updated meal plan
+      ...(cloudId ? { cloudId } : {})
     };
     
     setMealPlan(updatedMealPlan);
     
     // Save the updated meal plan to the database to persist the checked state
-    // Check if this meal plan has already been saved to the database
-    const savedPlan = initialMealPlan as unknown as { cloudId?: string, title?: string };
-    
-    if (savedPlan.cloudId) {
+    if (cloudId) {
       // If this is a saved meal plan, update it in the database
       const planTitle = savedPlan.title || `Meal Plan ${new Date().toLocaleDateString()}`;
       
+      console.log(`Updating meal plan ${cloudId} with checked state changes`);
+      
       // Save the updated meal plan to persist the grocery list state
       saveMealPlan(updatedMealPlan, planTitle)
-        .then(() => {
+        .then((savedMealPlan) => {
           console.log('Grocery list checked state saved successfully');
+          // No need to update state again as we're just updating the existing plan
         })
         .catch(error => {
           console.error('Failed to save grocery list checked state:', error);

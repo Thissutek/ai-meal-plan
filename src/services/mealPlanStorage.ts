@@ -35,21 +35,54 @@ export const saveMealPlan = async (
 
   const deviceId = await getDeviceId();
   const planTitle = title || `Meal Plan ${new Date().toLocaleDateString()}`;
-
+  
+  // Check if this is an existing meal plan that needs to be updated
+  const mealPlanWithId = mealPlan as unknown as { cloudId?: string };
+  const existingId = mealPlanWithId.cloudId;
+  
   try {
-    const { data, error } = await supabase
-      .from("meal_plans")
-      .insert({
-        device_id: deviceId,
-        title: planTitle,
-        total_cost: mealPlan.totalCost,
-        family_size: mealPlan.familySize,
-        preferences: mealPlan.preferences,
-        meals: mealPlan.meals,
-        grocery_list: mealPlan.groceryList || null,
-      })
-      .select("*")
-      .single();
+    let data;
+    let error;
+    
+    if (existingId) {
+      // Update existing meal plan
+      console.log(`Updating existing meal plan with ID: ${existingId}`);
+      const result = await supabase
+        .from("meal_plans")
+        .update({
+          title: planTitle,
+          total_cost: mealPlan.totalCost,
+          family_size: mealPlan.familySize,
+          preferences: mealPlan.preferences,
+          meals: mealPlan.meals,
+          grocery_list: mealPlan.groceryList || null,
+        })
+        .eq("id", existingId)
+        .select("*")
+        .single();
+      
+      data = result.data;
+      error = result.error;
+    } else {
+      // Insert new meal plan
+      console.log('Creating new meal plan');
+      const result = await supabase
+        .from("meal_plans")
+        .insert({
+          device_id: deviceId,
+          title: planTitle,
+          total_cost: mealPlan.totalCost,
+          family_size: mealPlan.familySize,
+          preferences: mealPlan.preferences,
+          meals: mealPlan.meals,
+          grocery_list: mealPlan.groceryList || null,
+        })
+        .select("*")
+        .single();
+      
+      data = result.data;
+      error = result.error;
+    }
 
     if (error) {
       console.error("Database save error:", error);
