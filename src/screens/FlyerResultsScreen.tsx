@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
   ScrollView,
   SafeAreaView,
   Alert,
+  BackHandler,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList, FlyerData, Product } from '../../App';
@@ -28,6 +29,24 @@ const FlyerResultsScreen: React.FC<Props> = ({ route, navigation }) => {
   const [editingProduct, setEditingProduct] = useState<{ product: Product, flyerIndex: number, productIndex: number } | null>(null);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [selectedFlyerIndex, setSelectedFlyerIndex] = useState(0);
+  
+  // Disable back navigation to prevent API overuse
+  useEffect(() => {
+    // Disable hardware back button
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      return true; // Prevent default back behavior
+    });
+    
+    // Disable navigation back gesture and header back button
+    navigation.setOptions({
+      headerLeft: () => null,
+      gestureEnabled: false
+    });
+    
+    return () => {
+      backHandler.remove();
+    };
+  }, [navigation]);
 
   // Form state for editing/adding products
   const [editForm, setEditForm] = useState({
