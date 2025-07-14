@@ -572,14 +572,15 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
           isSaving={isSaving}
         />
     
-        {/* Bottom Actions - Only show for camera flow */}
-        {source === 'camera' && (
-          <ActionButtons
-            onSave={openSaveModal}
-            onShare={shareMealPlan}
-            onNewPlan={() => navigation.navigate('Camera')}
-          />
-        )}
+        {/* Bottom Actions - Share is always visible, Save and New Plan only in camera flow */}
+        <ActionButtons
+          onSave={openSaveModal}
+          onShare={shareMealPlan}
+          onNewPlan={() => navigation.navigate('Camera')}
+          showSaveButton={source === 'camera'}
+          showShareButton={true}
+          showNewPlanButton={source === 'camera'}
+        />
       </SafeAreaView>
     );
 };

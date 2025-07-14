@@ -5,35 +5,52 @@ interface ActionButtonsProps {
   onSave: () => void;
   onShare: () => void;
   onNewPlan: () => void;
+  showSaveButton?: boolean;
+  showShareButton?: boolean;
+  showNewPlanButton?: boolean;
 }
 
 const ActionButtons: React.FC<ActionButtonsProps> = ({
   onSave,
   onShare,
   onNewPlan,
+  showSaveButton = true,
+  showShareButton = true,
+  showNewPlanButton = true,
 }) => {
+  // If no buttons are visible, don't render the container
+  if (!showSaveButton && !showShareButton && !showNewPlanButton) {
+    return null;
+  }
+  
   return (
     <View style={styles.actionsContainer}>
-      <TouchableOpacity
-        style={[styles.actionButton, styles.saveActionButton]}
-        onPress={onSave}
-      >
-        <Text style={styles.actionButtonText}>💾 Save Plan</Text>
-      </TouchableOpacity>
+      {showSaveButton && (
+        <TouchableOpacity
+          style={[styles.actionButton, styles.saveActionButton]}
+          onPress={onSave}
+        >
+          <Text style={styles.actionButtonText}>💾 Save Plan</Text>
+        </TouchableOpacity>
+      )}
 
-      <TouchableOpacity
-        style={[styles.actionButton, styles.shareButton]}
-        onPress={onShare}
-      >
-        <Text style={styles.actionButtonText}>📤 Share</Text>
-      </TouchableOpacity>
+      {showShareButton && (
+        <TouchableOpacity
+          style={[styles.actionButton, styles.shareButton]}
+          onPress={onShare}
+        >
+          <Text style={styles.actionButtonText}>📤 Share</Text>
+        </TouchableOpacity>
+      )}
 
-      <TouchableOpacity
-        style={[styles.actionButton, styles.newPlanButton]}
-        onPress={onNewPlan}
-      >
-        <Text style={styles.actionButtonText}>🆕 New Plan</Text>
-      </TouchableOpacity>
+      {showNewPlanButton && (
+        <TouchableOpacity
+          style={[styles.actionButton, styles.newPlanButton]}
+          onPress={onNewPlan}
+        >
+          <Text style={styles.actionButtonText}>🆕 New Plan</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
