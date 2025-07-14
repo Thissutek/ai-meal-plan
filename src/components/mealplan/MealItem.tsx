@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Meal } from '../../App';
+import { Meal } from '../../../App';
 
 interface MealItemProps {
   meal: Meal;
@@ -34,7 +34,7 @@ const MealItem: React.FC<MealItemProps> = ({
         <View style={styles.mealDetails}>
           <View style={styles.ingredientsSection}>
             <Text style={styles.sectionTitle}>Ingredients:</Text>
-            {meal.ingredients.map((ingredient, index) => (
+            {meal.ingredients.map((ingredient: { name: string; quantity: string; price: number }, index: number) => (
               <View key={index} style={styles.ingredientRow}>
                 <Text style={styles.ingredientText}>
                   • {ingredient.quantity} {ingredient.name}
@@ -46,14 +46,16 @@ const MealItem: React.FC<MealItemProps> = ({
             ))}
           </View>
 
-          <View style={styles.instructionsSection}>
-            <Text style={styles.sectionTitle}>Instructions:</Text>
-            {meal.instructions.map((instruction, index) => (
-              <Text key={index} style={styles.instructionText}>
-                {index + 1}. {instruction}
-              </Text>
-            ))}
-          </View>
+          {meal.instructions && meal.instructions.length > 0 && (
+            <View style={styles.instructionsSection}>
+              <Text style={styles.sectionTitle}>Instructions:</Text>
+              {meal.instructions.map((instruction: string, index: number) => (
+                <Text key={index} style={styles.instructionText}>
+                  {index + 1}. {instruction}
+                </Text>
+              ))}
+            </View>
+          )}
         </View>
       )}
     </View>
