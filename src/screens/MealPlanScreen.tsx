@@ -8,7 +8,9 @@ import {
   View,
   Text,
   BackHandler,
+  TouchableOpacity,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList, MealPlan, Meal, SerializableMealPlan } from '../../App';
 import { saveMealPlan } from '../services/mealPlanStorage';
@@ -58,6 +60,19 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
   
   // Disable back navigation to prevent API overuse
   useEffect(() => {
+    // Set up the home button in the header right
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity 
+          onPress={() => navigation.navigate('Home')} 
+          style={{ marginRight: 16 }}
+          accessibilityLabel="Go to home screen"
+        >
+          <Ionicons name="home-outline" size={24} color="#fff" />
+        </TouchableOpacity>
+      )
+    });
+    
     // Only disable back navigation if coming from camera flow
     if (source === 'camera') {
       // Disable hardware back button
@@ -68,7 +83,16 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
       // Disable navigation back gesture and header back button
       navigation.setOptions({
         headerLeft: () => null,
-        gestureEnabled: false
+        gestureEnabled: false,
+        headerRight: () => (
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('Home')} 
+            style={{ marginRight: 16 }}
+            accessibilityLabel="Go to home screen"
+          >
+            <Ionicons name="home-outline" size={24} color="#fff" />
+          </TouchableOpacity>
+        )
       });
       
       return () => {

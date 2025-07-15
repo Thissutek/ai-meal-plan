@@ -14,7 +14,7 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.yourname.aimealplanner",
+      "bundleIdentifier": "com.placeholder.aimealplanner",
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera to take photos of grocery flyers for meal planning.",
         "NSPhotoLibraryUsageDescription": "This app accesses your photo library to select flyer images for meal planning."
@@ -24,7 +24,7 @@
       "adaptiveIcon": {
         "backgroundColor": "#2E7D32"
       },
-      "package": "com.yourname.aimealplanner",
+      "package": "com.placeholder.aimealplanner",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",

@@ -312,9 +312,9 @@ Rules:
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "gpt-3.5-turbo", // Changed from gpt-4o for cost savings
+        model: "gpt-3.5-turbo", // Standard model
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 1200, // Optimized for 21 meals
+        max_tokens: 2000, // Increased from 1200 to handle more complex meal plans
         temperature: 0.1, // Low temperature for consistency
       }),
     });
