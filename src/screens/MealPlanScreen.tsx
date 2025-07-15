@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   View,
   Text,
+  BackHandler,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList, MealPlan, Meal, SerializableMealPlan } from '../../App';
@@ -54,6 +55,27 @@ const MealPlanScreen: React.FC<Props> = ({ route, navigation }) => {
   const [showWeeklyView, setShowWeeklyView] = useState(true);
   const [selectedDayMeals, setSelectedDayMeals] = useState<Meal[]>([]);
   const [selectedDayIndex, setSelectedDayIndex] = useState<number>(0);
+  
+  // Disable back navigation to prevent API overuse
+  useEffect(() => {
+    // Only disable back navigation if coming from camera flow
+    if (source === 'camera') {
+      // Disable hardware back button
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        return true; // Prevent default back behavior
+      });
+      
+      // Disable navigation back gesture and header back button
+      navigation.setOptions({
+        headerLeft: () => null,
+        gestureEnabled: false
+      });
+      
+      return () => {
+        backHandler.remove();
+      };
+    }
+  }, [navigation, source]);
   
   // Grocery list state
   const [activeTab, setActiveTab] = useState<'meals' | 'grocery'>('meals');
