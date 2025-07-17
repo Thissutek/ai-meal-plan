@@ -127,7 +127,7 @@ export default function App(): React.ReactElement {
           name="Home"
           component={HomeScreen}
           options={({ navigation }) => ({
-            title: 'Sayvr',
+            title: 'Savyr',
             headerLeft: () => null, // This removes the back button
             gestureEnabled: false // This disables the swipe back gesture
           })}
