@@ -1,20 +1,24 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
   SafeAreaView,
   Alert,
-  ActivityIndicator,
-  Image,
-  TextInput,
-  Modal,
+  BackHandler,
 } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList, FlyerData, Product } from '../../App';
 import { generateMealPlanFromProducts, serializeMealPlanForNavigation } from '../services/openaiService';
+import {
+  ProductCard,
+  FlyerSection,
+  SummaryCard,
+  ScannedImages,
+  CategorySummary,
+  ProductFormModal,
+  BottomActions
+} from '../components/flyerResults';
 
 type Props = StackScreenProps<RootStackParamList, 'FlyerResults'>;
 
@@ -25,6 +29,24 @@ const FlyerResultsScreen: React.FC<Props> = ({ route, navigation }) => {
   const [editingProduct, setEditingProduct] = useState<{ product: Product, flyerIndex: number, productIndex: number } | null>(null);
   const [showAddProductModal, setShowAddProductModal] = useState(false);
   const [selectedFlyerIndex, setSelectedFlyerIndex] = useState(0);
+  
+  // Disable back navigation to prevent API overuse
+  useEffect(() => {
+    // Disable hardware back button
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      return true; // Prevent default back behavior
+    });
+    
+    // Disable navigation back gesture and header back button
+    navigation.setOptions({
+      headerLeft: () => null,
+      gestureEnabled: false
+    });
+    
+    return () => {
+      backHandler.remove();
+    };
+  }, [navigation]);
 
   // Form state for editing/adding products
   const [editForm, setEditForm] = useState({
@@ -181,7 +203,7 @@ const FlyerResultsScreen: React.FC<Props> = ({ route, navigation }) => {
     try {
       const mealPlan = await generateMealPlanFromProducts(allProducts, preferences);
       const serializedMealPlan = serializeMealPlanForNavigation(mealPlan);
-      navigation.navigate('MealPlan', { mealPlan: serializedMealPlan });
+      navigation.navigate('MealPlan', { mealPlan: serializedMealPlan, source: 'camera' });
     } catch (error) {
       console.error('Error generating meal plan:', error);
       Alert.alert(
@@ -194,98 +216,30 @@ const FlyerResultsScreen: React.FC<Props> = ({ route, navigation }) => {
   };
 
   const renderProduct = (product: Product, index: number, flyerIndex: number) => {
-    const categoryColor = getCategoryColor(product.category);
-    const categoryIcon = getCategoryIcon(product.category);
-
     return (
-      <View key={index} style={styles.productCard}>
-        <View style={styles.productHeader}>
-          <View style={styles.productName}>
-            <Text style={styles.categoryIcon}>{categoryIcon}</Text>
-            <Text style={styles.productNameText}>{product.name}</Text>
-          </View>
-          <View style={styles.priceContainer}>
-            {product.onSale && product.originalPrice && (
-              <Text style={styles.originalPrice}>
-                {formatPrice(product.originalPrice)}
-              </Text>
-            )}
-            <Text style={[styles.price, product.onSale && styles.salePrice]}>
-              {formatPrice(product.price)}
-            </Text>
-          </View>
-        </View>
-
-        <View style={styles.productDetails}>
-          <View style={[styles.categoryTag, { backgroundColor: categoryColor }]}>
-            <Text style={styles.categoryText}>{product.category}</Text>
-          </View>
-
-          {product.unit && (
-            <Text style={styles.unitText}>per {product.unit}</Text>
-          )}
-
-          {product.onSale && (
-            <View style={styles.saleTag}>
-              <Text style={styles.saleText}>ON SALE</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Edit/Delete Controls */}
-        <View style={styles.productControls}>
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() => openEditModal(product, flyerIndex, index)}
-          >
-            <Text style={styles.editButtonText}>✏️ Edit</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => deleteProduct(flyerIndex, index)}
-          >
-            <Text style={styles.deleteButtonText}>🗑️ Delete</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <ProductCard
+        key={index}
+        product={product}
+        flyerIndex={flyerIndex}
+        productIndex={index}
+        onEdit={openEditModal}
+        onDelete={deleteProduct}
+        formatPrice={formatPrice}
+        getCategoryIcon={getCategoryIcon}
+        getCategoryColor={getCategoryColor}
+      />
     );
   };
 
   const renderFlyerSection = (flyer: FlyerData, index: number) => {
     return (
-      <View key={index} style={styles.flyerSection}>
-        <View style={styles.flyerHeader}>
-          <Text style={styles.flyerTitle}>🏪 {flyer.storeName}</Text>
-          <View style={styles.flyerHeaderActions}>
-            <Text style={styles.productCount}>
-              {flyer.products.length} product{flyer.products.length !== 1 ? 's' : ''}
-            </Text>
-            <TouchableOpacity
-              style={styles.addProductButton}
-              onPress={() => openAddModal(index)}
-            >
-              <Text style={styles.addProductButtonText}>+ Add Product</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {flyer.products.length === 0 ? (
-          <View style={styles.noProductsContainer}>
-            <Text style={styles.noProductsText}>No products found in this flyer</Text>
-            <TouchableOpacity
-              style={styles.addFirstProductButton}
-              onPress={() => openAddModal(index)}
-            >
-              <Text style={styles.addFirstProductButtonText}>+ Add First Product</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          flyer.products.map((product, productIndex) =>
-            renderProduct(product, productIndex, index)
-          )
-        )}
-      </View>
+      <FlyerSection
+        key={index}
+        flyer={flyer}
+        index={index}
+        onAddProduct={openAddModal}
+        renderProduct={renderProduct}
+      />
     );
   };
 
@@ -293,229 +247,46 @@ const FlyerResultsScreen: React.FC<Props> = ({ route, navigation }) => {
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
         <View style={styles.content}>
-
           {/* Summary Header */}
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryTitle}>Flyer Parsing Results</Text>
-            <View style={styles.summaryStats}>
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>{totalProducts}</Text>
-                <Text style={styles.statLabel}>Products Found</Text>
-              </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>{totalStores}</Text>
-                <Text style={styles.statLabel}>Store{totalStores !== 1 ? 's' : ''} Scanned</Text>
-              </View>
-            </View>
-
-            {totalProducts === 0 && (
-              <View style={styles.noDataWarning}>
-                <Text style={styles.noDataText}>
-                  ⚠️ No products were detected in your flyer images. This could be due to:
-                </Text>
-                <Text style={styles.noDataTip}>• Poor image quality or lighting</Text>
-                <Text style={styles.noDataTip}>• Text that's too small to read</Text>
-                <Text style={styles.noDataTip}>• Flyers without clear price information</Text>
-              </View>
-            )}
-          </View>
+          <SummaryCard totalProducts={totalProducts} totalStores={totalStores} />
 
           {/* Scanned Images Preview */}
-          <View style={styles.imagesSection}>
-            <Text style={styles.imagesSectionTitle}>Scanned Images</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View style={styles.imagesContainer}>
-                {imageUris.map((uri, index) => (
-                  <Image key={index} source={{ uri }} style={styles.previewImage} />
-                ))}
-              </View>
-            </ScrollView>
-          </View>
+          <ScannedImages imageUris={imageUris} />
 
           {/* Flyer Results */}
           {flyerData.map((flyer, index) => renderFlyerSection(flyer, index))}
 
           {/* Products by Category Summary */}
           {totalProducts > 0 && (
-            <View style={styles.categorySummary}>
-              <Text style={styles.categorySummaryTitle}>Products by Category</Text>
-              {Object.entries(
-                allProducts.reduce((acc, product) => {
-                  acc[product.category] = (acc[product.category] || 0) + 1;
-                  return acc;
-                }, {} as { [key: string]: number })
-              ).map(([category, count]) => (
-                <View key={category} style={styles.categoryRow}>
-                  <Text style={styles.categoryIcon}>
-                    {getCategoryIcon(category)}
-                  </Text>
-                  <Text style={styles.categoryName}>
-                    {category.charAt(0).toUpperCase() + category.slice(1)}
-                  </Text>
-                  <Text style={styles.categoryCount}>
-                    {count} item{count !== 1 ? 's' : ''}
-                  </Text>
-                </View>
-              ))}
-            </View>
+            <CategorySummary allProducts={allProducts} getCategoryIcon={getCategoryIcon} />
           )}
-
         </View>
       </ScrollView>
 
       {/* Edit/Add Product Modal */}
-      <Modal
+      <ProductFormModal
         visible={editingProduct !== null || showAddProductModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => {
+        editingProduct={editingProduct}
+        editForm={editForm}
+        onClose={() => {
           setEditingProduct(null);
           setShowAddProductModal(false);
           resetEditForm();
         }}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {editingProduct ? 'Edit Product' : 'Add Product'}
-            </Text>
-
-            <ScrollView style={styles.modalForm}>
-              {/* Product Name */}
-              <Text style={styles.fieldLabel}>Product Name *</Text>
-              <TextInput
-                style={styles.textInput}
-                value={editForm.name}
-                onChangeText={(text) => setEditForm({ ...editForm, name: text })}
-                placeholder="e.g., Organic Bananas"
-                autoCapitalize="words"
-              />
-
-              {/* Price */}
-              <Text style={styles.fieldLabel}>Price *</Text>
-              <TextInput
-                style={styles.textInput}
-                value={editForm.price}
-                onChangeText={(text) => setEditForm({ ...editForm, price: text })}
-                placeholder="e.g., 2.99"
-                keyboardType="decimal-pad"
-              />
-
-              {/* Category */}
-              <Text style={styles.fieldLabel}>Category</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryScroll}>
-                {categories.map((category) => (
-                  <TouchableOpacity
-                    key={category}
-                    style={[
-                      styles.categoryOption,
-                      editForm.category === category && styles.categoryOptionSelected,
-                      { backgroundColor: editForm.category === category ? getCategoryColor(category) : '#f0f0f0' }
-                    ]}
-                    onPress={() => setEditForm({ ...editForm, category })}
-                  >
-                    <Text style={styles.categoryOptionIcon}>{getCategoryIcon(category)}</Text>
-                    <Text style={[
-                      styles.categoryOptionText,
-                      editForm.category === category && styles.categoryOptionTextSelected
-                    ]}>
-                      {category}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              {/* Unit */}
-              <Text style={styles.fieldLabel}>Unit (Optional)</Text>
-              <TextInput
-                style={styles.textInput}
-                value={editForm.unit}
-                onChangeText={(text) => setEditForm({ ...editForm, unit: text })}
-                placeholder="e.g., lb, kg, each"
-              />
-
-              {/* Sale Toggle */}
-              <View style={styles.saleContainer}>
-                <TouchableOpacity
-                  style={[styles.saleToggle, editForm.onSale && styles.saleToggleActive]}
-                  onPress={() => setEditForm({ ...editForm, onSale: !editForm.onSale })}
-                >
-                  <Text style={[styles.saleToggleText, editForm.onSale && styles.saleToggleTextActive]}>
-                    {editForm.onSale ? '✓' : '○'} On Sale
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Original Price (if on sale) */}
-              {editForm.onSale && (
-                <>
-                  <Text style={styles.fieldLabel}>Original Price</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    value={editForm.originalPrice}
-                    onChangeText={(text) => setEditForm({ ...editForm, originalPrice: text })}
-                    placeholder="e.g., 3.99"
-                    keyboardType="decimal-pad"
-                  />
-                </>
-              )}
-            </ScrollView>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalCancelButton}
-                onPress={() => {
-                  setEditingProduct(null);
-                  setShowAddProductModal(false);
-                  resetEditForm();
-                }}
-              >
-                <Text style={styles.modalCancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.modalSaveButton}
-                onPress={saveProductEdit}
-              >
-                <Text style={styles.modalSaveButtonText}>
-                  {editingProduct ? 'Save Changes' : 'Add Product'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        onSave={saveProductEdit}
+        setEditForm={setEditForm}
+        categories={categories}
+        getCategoryIcon={getCategoryIcon}
+        getCategoryColor={getCategoryColor}
+      />
 
       {/* Bottom Action */}
-      <View style={styles.bottomContainer}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>📷 Scan Again</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[
-            styles.generateButton,
-            (totalProducts === 0 || isGenerating) && styles.generateButtonDisabled
-          ]}
-          onPress={generateMealPlan}
-          disabled={totalProducts === 0 || isGenerating}
-        >
-          {isGenerating ? (
-            <View style={styles.generatingContainer}>
-              <ActivityIndicator color="#fff" size="small" />
-              <Text style={styles.generateButtonText}>Generating...</Text>
-            </View>
-          ) : (
-            <Text style={styles.generateButtonText}>
-              🍽️ Generate Meal Plan
-            </Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      <BottomActions
+        totalProducts={totalProducts}
+        isGenerating={isGenerating}
+        onBack={() => navigation.goBack()}
+        onGenerate={generateMealPlan}
+      />
     </SafeAreaView>
   );
 };
@@ -530,455 +301,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
-  },
-  summaryCard: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 15,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  summaryTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2E7D32',
-    textAlign: 'center',
-    marginBottom: 15,
-  },
-  summaryStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-  },
-  statItem: {
-    alignItems: 'center',
-  },
-  statNumber: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#4CAF50',
-  },
-  statLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 5,
-  },
-  statDivider: {
-    width: 1,
-    height: 40,
-    backgroundColor: '#eee',
-  },
-  noDataWarning: {
-    marginTop: 20,
-    padding: 15,
-    backgroundColor: '#FFF3E0',
-    borderRadius: 10,
-    borderLeftWidth: 4,
-    borderLeftColor: '#FF9800',
-  },
-  noDataText: {
-    fontSize: 14,
-    color: '#E65100',
-    marginBottom: 10,
-    fontWeight: 'bold',
-  },
-  noDataTip: {
-    fontSize: 12,
-    color: '#E65100',
-    marginBottom: 2,
-    paddingLeft: 10,
-  },
-  imagesSection: {
-    marginBottom: 20,
-  },
-  imagesSectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2E7D32',
-    marginBottom: 10,
-  },
-  imagesContainer: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  previewImage: {
-    width: 60,
-    height: 80,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  flyerSection: {
-    marginBottom: 20,
-  },
-  flyerHeader: {
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
-    flexDirection: 'column',
-    gap: 10,
-  },
-  flyerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2E7D32',
-  },
-  flyerHeaderActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  productCount: {
-    fontSize: 14,
-    color: '#666',
-  },
-  addProductButton: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
-  },
-  addProductButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  noProductsContainer: {
-    backgroundColor: '#fff',
-    padding: 30,
-    borderRadius: 10,
-    alignItems: 'center',
-    borderStyle: 'dashed',
-    borderWidth: 2,
-    borderColor: '#ddd',
-  },
-  noProductsText: {
-    fontSize: 16,
-    color: '#999',
-    marginBottom: 15,
-  },
-  addFirstProductButton: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-  },
-  addFirstProductButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  productControls: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    gap: 10,
-  },
-  editButton: {
-    flex: 1,
-    backgroundColor: '#2196F3',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  editButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  deleteButton: {
-    flex: 1,
-    backgroundColor: '#F44336',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 6,
-    alignItems: 'center',
-  },
-  deleteButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    margin: 20,
-    borderRadius: 15,
-    maxHeight: '85%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2E7D32',
-    textAlign: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  modalForm: {
-    padding: 20,
-  },
-  fieldLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-    marginTop: 15,
-  },
-  textInput: {
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: '#f9f9f9',
-  },
-  categoryScroll: {
-    marginVertical: 10,
-  },
-  categoryOption: {
-    alignItems: 'center',
-    padding: 10,
-    borderRadius: 8,
-    marginRight: 10,
-    minWidth: 70,
-  },
-  categoryOptionSelected: {
-    // Background color set dynamically
-  },
-  categoryOptionIcon: {
-    fontSize: 20,
-    marginBottom: 4,
-  },
-  categoryOptionText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#666',
-    textTransform: 'capitalize',
-  },
-  categoryOptionTextSelected: {
-    color: '#fff',
-  },
-  saleContainer: {
-    marginVertical: 15,
-  },
-  saleToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderWidth: 2,
-    borderColor: '#ddd',
-    borderRadius: 8,
-    backgroundColor: '#f9f9f9',
-  },
-  saleToggleActive: {
-    borderColor: '#4CAF50',
-    backgroundColor: '#E8F5E8',
-  },
-  saleToggleText: {
-    fontSize: 16,
-    color: '#666',
-    fontWeight: 'bold',
-  },
-  saleToggleTextActive: {
-    color: '#4CAF50',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    padding: 20,
-    gap: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-  },
-  modalCancelButton: {
-    flex: 1,
-    padding: 15,
-    borderRadius: 8,
-    backgroundColor: '#f5f5f5',
-    alignItems: 'center',
-  },
-  modalCancelButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#666',
-  },
-  modalSaveButton: {
-    flex: 1,
-    padding: 15,
-    borderRadius: 8,
-    backgroundColor: '#4CAF50',
-    alignItems: 'center',
-  },
-  modalSaveButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  productCard: {
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  productHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  productName: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  categoryIcon: {
-    fontSize: 20,
-    marginRight: 10,
-  },
-  productNameText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    flex: 1,
-  },
-  priceContainer: {
-    alignItems: 'flex-end',
-  },
-  price: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2E7D32',
-  },
-  salePrice: {
-    color: '#F44336',
-  },
-  originalPrice: {
-    fontSize: 14,
-    color: '#999',
-    textDecorationLine: 'line-through',
-  },
-  productDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  categoryTag: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  categoryText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  unitText: {
-    fontSize: 12,
-    color: '#666',
-  },
-  saleTag: {
-    backgroundColor: '#F44336',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  saleText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  categorySummary: {
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 20,
-  },
-  categorySummaryTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2E7D32',
-    marginBottom: 15,
-  },
-  categoryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  categoryName: {
-    fontSize: 14,
-    color: '#333',
-    flex: 1,
-    marginLeft: 10,
-  },
-  categoryCount: {
-    fontSize: 12,
-    color: '#666',
-    fontWeight: 'bold',
-  },
-  bottomContainer: {
-    flexDirection: 'row',
-    padding: 20,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    gap: 10,
-  },
-  backButton: {
-    flex: 1,
-    backgroundColor: '#6c757d',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  backButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  generateButton: {
-    flex: 2,
-    backgroundColor: '#4CAF50',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  generateButtonDisabled: {
-    backgroundColor: '#ccc',
-  },
-  generateButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  generatingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
   },
 });
 

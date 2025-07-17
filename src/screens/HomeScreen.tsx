@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
-  TouchableOpacity,
   StatusBar,
   SafeAreaView,
   Alert,
@@ -12,6 +10,13 @@ import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList, UserPreferences } from '../../App';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getMealPlanCount } from '../services/mealPlanStorage';
+
+// Import components
+import Header from '../components/shared/Header';
+import ActionButton from '../components/shared/ActionButton';
+import SavedPlansButton from '../components/home/SavedPlansButton';
+import PreferencesCard from '../components/home/PreferencesCard';
+import InstructionsCard from '../components/home/InstructionsCard';
 
 type Props = StackScreenProps<RootStackParamList, 'Home'>;
 
@@ -74,93 +79,47 @@ const HomeScreen: React.FC<Props> = ({ navigation }) => {
     navigation.navigate('Preferences');
   };
 
+  // Define instruction steps
+  const instructionSteps = [
+    { number: 1, text: 'Set your dietary preferences and family size' },
+    { number: 2, text: 'Take photos of up to 3 grocery flyers' },
+    { number: 3, text: 'Get AI-generated meal plans with cost estimates' },
+    { number: 4, text: 'Save your favorite meal plans for later' },
+  ];
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#2E7D32" />
 
-      <View style={styles.header}>
-        <Text style={styles.title}>Home Screen</Text>
-        <Text style={styles.subtitle}>
-          Take photos of grocery flyers and get personalized meal plans with cost estimates
-        </Text>
-
-        {/* Saved plans icon button in top right */}
-        <TouchableOpacity
-          style={styles.savedPlansIconButton}
-          onPress={() => navigation.navigate('SavedPlans')}
-        >
-          <Text style={styles.savedPlansIcon}>📋</Text>
-          {savedPlansCount > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>{savedPlansCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
+      <Header 
+        title="Home Screen" 
+        subtitle="Take photos of grocery flyers and get personalized meal plans with cost estimates"
+      >
+        <SavedPlansButton 
+          count={savedPlansCount} 
+          onPress={() => navigation.navigate('SavedPlans')} 
+        />
+      </Header>
 
       <View style={styles.content}>
         {hasPreferences && preferences && (
-          <View style={styles.preferencesCard}>
-            <Text style={styles.preferencesTitle}>Your Current Settings:</Text>
-            <Text style={styles.preferencesText}>
-              Family Size: {preferences.familySize} {preferences.familySize === 1 ? 'person' : 'people'}
-            </Text>
-            {preferences.allergies.length > 0 && (
-              <Text style={styles.preferencesText}>
-                Allergies: {preferences.allergies.join(', ')}
-              </Text>
-            )}
-            {preferences.dietaryRestrictions.length > 0 && (
-              <Text style={styles.preferencesText}>
-                Dietary Restrictions: {preferences.dietaryRestrictions.join(', ')}
-              </Text>
-            )}
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={handleEditPreferences}
-            >
-              <Text style={styles.editButtonText}>Edit Preferences</Text>
-            </TouchableOpacity>
-          </View>
+          <PreferencesCard 
+            preferences={preferences} 
+            onEditPress={handleEditPreferences} 
+          />
         )}
 
-        <View style={styles.instructions}>
-          <Text style={styles.instructionsTitle}>How it works:</Text>
-          <View style={styles.step}>
-            <Text style={styles.stepNumber}>1</Text>
-            <Text style={styles.stepText}>Set your preferences (family size, allergies, etc.)</Text>
-          </View>
-          <View style={styles.step}>
-            <Text style={styles.stepNumber}>2</Text>
-            <Text style={styles.stepText}>Take photos of up to 3 grocery flyers</Text>
-          </View>
-          <View style={styles.step}>
-            <Text style={styles.stepNumber}>3</Text>
-            <Text style={styles.stepText}>Get AI-generated meal plans with cost estimates</Text>
-          </View>
-          <View style={styles.step}>
-            <Text style={styles.stepNumber}>4</Text>
-            <Text style={styles.stepText}>Save your favorite meal plans for later</Text>
-          </View>
-        </View>
+        <InstructionsCard 
+          title="How It Works:" 
+          steps={instructionSteps} 
+        />
       </View>
 
       <View style={styles.buttonContainer}>
-        {!hasPreferences ? (
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={() => navigation.navigate('Preferences')}
-          >
-            <Text style={styles.primaryButtonText}>Set Preferences First</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={handleStartPlanning}
-          >
-            <Text style={styles.primaryButtonText}>Start Meal Planning</Text>
-          </TouchableOpacity>
-        )}
+        <ActionButton
+          title={!hasPreferences ? "Set Preferences First" : "Start Meal Planning"}
+          onPress={!hasPreferences ? () => navigation.navigate('Preferences') : handleStartPlanning}
+        />
       </View>
     </SafeAreaView>
   );
@@ -171,146 +130,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  header: {
-    backgroundColor: '#2E7D32',
-    padding: 20,
-    paddingTop: 40,
-    position: 'relative',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#fff',
-    textAlign: 'center',
-    opacity: 0.9,
-  },
-  savedPlansIconButton: {
-    position: 'absolute',
-    top: 40,
-    right: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 25,
-    width: 50,
-    height: 50,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  savedPlansIcon: {
-    fontSize: 24,
-    color: '#fff',
-  },
-  badge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    backgroundColor: '#FF5722',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 6,
-  },
-  badgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
   content: {
     flex: 1,
     padding: 20,
   },
-  preferencesCard: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 10,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  preferencesTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#2E7D32',
-  },
-  preferencesText: {
-    fontSize: 16,
-    marginBottom: 5,
-    color: '#333',
-  },
-  editButton: {
-    backgroundColor: '#4CAF50',
-    padding: 10,
-    borderRadius: 5,
-    marginTop: 10,
-    alignSelf: 'flex-start',
-  },
-  editButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-  },
-  instructions: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  instructionsTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#2E7D32',
-  },
-  step: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  stepNumber: {
-    backgroundColor: '#4CAF50',
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    textAlign: 'center',
-    lineHeight: 30,
-    marginRight: 15,
-  },
-  stepText: {
-    fontSize: 16,
-    color: '#333',
-    flex: 1,
-  },
   buttonContainer: {
     padding: 20,
-  },
-  primaryButton: {
-    backgroundColor: '#4CAF50',
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  primaryButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
   },
 });
 

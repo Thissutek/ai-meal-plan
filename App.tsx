@@ -1,3 +1,14 @@
+import React, { useEffect } from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createStackNavigator } from '@react-navigation/stack';
+import HomeScreen from './src/screens/HomeScreen';
+import PreferencesScreen from './src/screens/PreferenceScreen';
+import CameraScreen from './src/screens/CameraScreen';
+import FlyerResultsScreen from './src/screens/FlyerResultsScreen';
+import MealPlanScreen from './src/screens/MealPlanScreen';
+import SavedPlansScreen from './src/screens/SavedPlansScreen';
+import { initializeDeviceId } from './src/services/deviceService';
+
 export interface FlyerData {
   storeName: string;
   products: Product[];
@@ -10,23 +21,14 @@ export interface Product {
   unit?: string;
   originalPrice?: number;
   onSale?: boolean;
-}import React, { useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import { createStackNavigator } from '@react-navigation/stack';
-import HomeScreen from './src/screens/HomeScreen';
-import PreferencesScreen from './src/screens/PreferenceScreen';
-import CameraScreen from './src/screens/CameraScreen';
-import FlyerResultsScreen from './src/screens/FlyerResultsScreen';
-import MealPlanScreen from './src/screens/MealPlanScreen';
-import SavedPlansScreen from './src/screens/SavedPlansScreen';
-import { initializeDeviceId } from './src/services/deviceService';
+}
 
 export type RootStackParamList = {
   Home: undefined;
   Preferences: undefined;
   Camera: undefined;
   FlyerResults: { flyerData: FlyerData[], imageUris: string[], preferences: UserPreferences };
-  MealPlan: { mealPlan: SerializableMealPlan };
+  MealPlan: { mealPlan: SerializableMealPlan, source?: 'home' | 'camera' | 'saved' };
   SavedPlans: undefined;
 };
 
@@ -77,9 +79,10 @@ export interface Meal {
   id: string;
   name: string;
   ingredients: Ingredient[];
-  instructions: string[];
+  instructions?: string[]; // Made optional to reduce token usage
   cost: number;
-  category: 'breakfast' | 'lunch' | 'dinner' | 'snack';
+  category: 'breakfast' | 'lunch' | 'dinner';
+  day?: string; // Day of the week (Monday, Tuesday, etc.)
 }
 
 export interface Ingredient {
@@ -98,7 +101,7 @@ export interface UserPreferences {
 
 const Stack = createStackNavigator<RootStackParamList>();
 
-export default function App(): JSX.Element {
+export default function App(): React.ReactElement {
   useEffect(() => {
     // Initialize device ID when app starts
     initializeDeviceId().then(deviceId => {
@@ -123,7 +126,11 @@ export default function App(): JSX.Element {
         <Stack.Screen
           name="Home"
           component={HomeScreen}
-          options={{ title: 'Sayvr' }}
+          options={({ navigation }) => ({
+            title: 'Sayvr',
+            headerLeft: () => null, // This removes the back button
+            gestureEnabled: false // This disables the swipe back gesture
+          })}
         />
         <Stack.Screen
           name="Preferences"
